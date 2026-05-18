@@ -533,15 +533,15 @@ function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70 }) {
 /* ═════════════════════ APP ═════════════════════ */
 
 function PulsingHeart({ bpm, color }) {
-  if (bpm===0) return <span style={{color,fontSize:15,opacity:0.4}}>—</span>;
-  return <span style={{display:"inline-block",animation:`heartbeat ${60000/bpm}ms ease-in-out infinite`,color,fontSize:15}}>♥</span>;
+  if (bpm===0) return <span style={{color,fontSize:18,opacity:0.4}}>—</span>;
+  return <span style={{display:"inline-block",animation:`heartbeat ${60000/bpm}ms ease-in-out infinite`,color,fontSize:18}}>♥</span>;
 }
 
 function ShockBadge({ shockable }) {
   if (shockable === null) return null;
   return (
     <span style={{
-      fontSize:8.5, fontWeight:700, letterSpacing:".08em", padding:"3px 8px", borderRadius:4,
+      fontSize:11, fontWeight:700, letterSpacing:".08em", padding:"3px 8px", borderRadius:4,
       background: shockable ? "rgba(239,68,68,0.15)" : "rgba(100,116,139,0.12)",
       color: shockable ? "#ef4444" : "#94a3b8",
       border: `1px solid ${shockable ? "rgba(239,68,68,0.3)" : "rgba(100,116,139,0.2)"}`,
@@ -575,17 +575,17 @@ export default function ECGSimulatorGuide() {
         @keyframes glow-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
         @keyframes fade-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         *{box-sizing:border-box}
-        .cat-pill{padding:4px 10px;border-radius:16px;border:1px solid rgba(100,116,139,0.18);background:transparent;color:#64748b;font-family:inherit;font-size:10px;cursor:pointer;transition:all .2s;letter-spacing:.06em;white-space:nowrap}
+        .cat-pill{padding:4px 10px;border-radius:16px;border:1px solid rgba(100,116,139,0.18);background:transparent;color:#64748b;font-family:inherit;font-size:13px;cursor:pointer;transition:all .2s;letter-spacing:.06em;white-space:nowrap}
         .cat-pill:hover{border-color:rgba(52,211,153,0.35);color:#94a3b8}.cat-pill.active{border-color:#34d399;color:#34d399;background:rgba(52,211,153,0.08)}
         .r-item{padding:8px 10px;border-radius:6px;cursor:pointer;width:100%;border:1px solid rgba(100,116,139,0.08);background:rgba(15,23,42,0.3);transition:all .2s;font-family:inherit;text-align:left}
         .r-item:hover{background:rgba(52,211,153,0.04);border-color:rgba(52,211,153,0.18)}.r-item.active{border-color:rgba(52,211,153,0.4);background:rgba(52,211,153,0.06)}
-        .ctrl-btn{padding:5px 12px;border-radius:5px;border:1px solid rgba(52,211,153,0.18);background:rgba(52,211,153,0.03);color:#94a3b8;font-family:inherit;font-size:10px;cursor:pointer;transition:all .15s;letter-spacing:.04em}
+        .ctrl-btn{padding:5px 12px;border-radius:5px;border:1px solid rgba(52,211,153,0.18);background:rgba(52,211,153,0.03);color:#94a3b8;font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s;letter-spacing:.04em}
         .ctrl-btn:hover{background:rgba(52,211,153,0.1);color:#e2e8f0}.ctrl-btn.on{background:rgba(52,211,153,0.12);color:#34d399;border-color:#34d399}
-        .tab-btn{padding:5px 12px;border-radius:5px;border:1px solid rgba(100,116,139,0.12);background:transparent;color:#64748b;font-family:inherit;font-size:10px;cursor:pointer;transition:all .15s;letter-spacing:.06em}
+        .tab-btn{padding:5px 12px;border-radius:5px;border:1px solid rgba(100,116,139,0.12);background:transparent;color:#64748b;font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s;letter-spacing:.06em}
         .tab-btn:hover{color:#94a3b8;border-color:rgba(100,116,139,0.25)}.tab-btn.active{color:#e2e8f0;border-color:rgba(52,211,153,0.3);background:rgba(52,211,153,0.05)}
         .wave-card{padding:10px 13px;border-radius:7px;cursor:pointer;width:100%;border:1px solid rgba(100,116,139,0.08);background:rgba(15,23,42,0.2);transition:all .2s;font-family:inherit;text-align:left}
         .wave-card:hover{border-color:rgba(100,116,139,0.2);background:rgba(15,23,42,0.4)}
-        .lead-btn{padding:3px 7px;border-radius:4px;border:1px solid rgba(100,116,139,0.12);background:transparent;color:#64748b;font-family:inherit;font-size:9px;cursor:pointer;transition:all .15s}
+        .lead-btn{padding:3px 7px;border-radius:4px;border:1px solid rgba(100,116,139,0.12);background:transparent;color:#64748b;font-family:inherit;font-size:12px;cursor:pointer;transition:all .15s}
         .lead-btn:hover{border-color:rgba(52,211,153,0.3);color:#94a3b8}.lead-btn.active{border-color:#34d399;color:#34d399;background:rgba(52,211,153,0.08)}
         ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(52,211,153,0.12);border-radius:3px}
       `}</style>
@@ -593,18 +593,18 @@ export default function ECGSimulatorGuide() {
       {/* HEADER */}
       <header style={{padding:"10px 16px",borderBottom:"1px solid rgba(52,211,153,0.08)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(5,10,20,0.85)",backdropFilter:"blur(12px)",position:"sticky",top:0,zIndex:80}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
-          {isMobile&&<button onClick={()=>setSidebarOpen(!sidebarOpen)} style={{background:"none",border:"1px solid rgba(52,211,153,0.15)",borderRadius:5,padding:"4px 7px",cursor:"pointer",color:"#94a3b8",fontSize:12,fontFamily:"inherit"}}>☰</button>}
+          {isMobile&&<button onClick={()=>setSidebarOpen(!sidebarOpen)} style={{background:"none",border:"1px solid rgba(52,211,153,0.15)",borderRadius:5,padding:"4px 7px",cursor:"pointer",color:"#94a3b8",fontSize:15,fontFamily:"inherit"}}>☰</button>}
           <div style={{width:28,height:28,borderRadius:6,background:"linear-gradient(135deg,#34d399,#059669)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 10px rgba(52,211,153,0.2)"}}>
-            <span style={{fontSize:12,color:"#050a14",fontWeight:700}}>♡</span>
+            <span style={{fontSize:15,color:"#050a14",fontWeight:700}}>♡</span>
           </div>
           <div>
-            <div style={{fontSize:12,fontWeight:700,letterSpacing:".06em",background:"linear-gradient(90deg,#34d399,#22d3ee)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>ECG SIMULATOR</div>
-            <div style={{fontSize:7,color:"#475569",letterSpacing:".18em"}}>COMPREHENSIVE RHYTHM GUIDE · 20 RHYTHMS</div>
+            <div style={{fontSize:15,fontWeight:700,letterSpacing:".06em",background:"linear-gradient(90deg,#34d399,#22d3ee)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>ECG SIMULATOR</div>
+            <div style={{fontSize:10,color:"#475569",letterSpacing:".18em"}}>COMPREHENSIVE RHYTHM GUIDE · 20 RHYTHMS</div>
           </div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <span style={{width:5,height:5,borderRadius:"50%",display:"inline-block",background:isRunning?"#34d399":"#ef4444",animation:isRunning?"glow-pulse 1.5s infinite":"none"}}/>
-          <span style={{fontSize:8,color:"#64748b",letterSpacing:".1em"}}>{isRunning?"LIVE":"PAUSED"}</span>
+          <span style={{fontSize:11,color:"#64748b",letterSpacing:".1em"}}>{isRunning?"LIVE":"PAUSED"}</span>
         </div>
       </header>
 
@@ -613,26 +613,26 @@ export default function ECGSimulatorGuide() {
 
         {/* SIDEBAR */}
         <aside style={{width:isMobile?255:220,minWidth:isMobile?255:220,borderRight:"1px solid rgba(52,211,153,0.06)",padding:"12px 8px",overflowY:"auto",maxHeight:"calc(100vh - 50px)",background:"rgba(5,10,20,0.95)",zIndex:95,...(isMobile?{position:"fixed",left:0,top:50,bottom:0,transform:sidebarOpen?"translateX(0)":"translateX(-100%)",transition:"transform .25s ease"}:{})}}>
-          <div style={{fontSize:8,color:"#475569",letterSpacing:".2em",marginBottom:5}}>FILTER</div>
+          <div style={{fontSize:11,color:"#475569",letterSpacing:".2em",marginBottom:5}}>FILTER</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:3,marginBottom:12}}>
             {CATEGORIES.map(c=><button key={c} className={`cat-pill ${category===c?"active":""}`} onClick={()=>setCategory(c)}>{c}</button>)}
           </div>
-          <div style={{fontSize:8,color:"#475569",letterSpacing:".2em",marginBottom:5}}>RHYTHMS · {filtered.length}</div>
+          <div style={{fontSize:11,color:"#475569",letterSpacing:".2em",marginBottom:5}}>RHYTHMS · {filtered.length}</div>
           <div style={{display:"flex",flexDirection:"column",gap:2}}>
             {filtered.map(([key,val])=>(
               <button key={key} className={`r-item ${rhythm===key?"active":""}`} onClick={()=>{setRhythm(key);setSidebarOpen(false);setTab("clinical")}}>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                   <span style={{width:5,height:5,borderRadius:"50%",background:val.color,boxShadow:rhythm===key?`0 0 6px ${val.color}60`:"none",flexShrink:0}}/>
-                  <span style={{fontSize:10,fontWeight:rhythm===key?600:400,color:rhythm===key?"#e2e8f0":"#94a3b8",lineHeight:1.3}}>{val.name}</span>
+                  <span style={{fontSize:13,fontWeight:rhythm===key?600:400,color:rhythm===key?"#e2e8f0":"#94a3b8",lineHeight:1.3}}>{val.name}</span>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:4,marginTop:2,paddingLeft:11}}>
-                  <span style={{fontSize:8,color:"#475569"}}>{val.bpm>0?val.bpm+" bpm":"No output"} · {val.category}</span>
-                  {val.shockable!==null&&<span style={{fontSize:7,color:val.shockable?"#ef4444":"#64748b"}}>{val.shockable?"⚡":"✕"}</span>}
+                  <span style={{fontSize:11,color:"#475569"}}>{val.bpm>0?val.bpm+" bpm":"No output"} · {val.category}</span>
+                  {val.shockable!==null&&<span style={{fontSize:10,color:val.shockable?"#ef4444":"#64748b"}}>{val.shockable?"⚡":"✕"}</span>}
                 </div>
               </button>
             ))}
           </div>
-          <div style={{marginTop:14,padding:"8px",borderRadius:6,background:"rgba(52,211,153,0.03)",border:"1px solid rgba(52,211,153,0.06)",fontSize:8,color:"#475569",lineHeight:1.6}}>
+          <div style={{marginTop:14,padding:"8px",borderRadius:6,background:"rgba(52,211,153,0.03)",border:"1px solid rgba(52,211,153,0.06)",fontSize:11,color:"#475569",lineHeight:1.6}}>
             <strong style={{color:"#64748b"}}>Refs:</strong> Dubin (6th), LITFL, Goldberger (9th), AHA/ACC. Educational only.
           </div>
         </aside>
@@ -642,20 +642,20 @@ export default function ECGSimulatorGuide() {
           {/* Vitals */}
           <div style={{display:"flex",alignItems:"center",gap:10,padding:"7px 12px",background:"rgba(15,23,42,0.5)",borderRadius:8,border:"1px solid rgba(52,211,153,0.06)",marginBottom:8,flexWrap:"wrap"}}>
             <div style={{minWidth:80}}>
-              <div style={{fontSize:7,color:"#475569",letterSpacing:".2em"}}>RHYTHM</div>
-              <div style={{fontSize:10,fontWeight:700,color:current.color,marginTop:1}}>{current.name}</div>
+              <div style={{fontSize:10,color:"#475569",letterSpacing:".2em"}}>RHYTHM</div>
+              <div style={{fontSize:13,fontWeight:700,color:current.color,marginTop:1}}>{current.name}</div>
             </div>
             <div style={{width:1,height:22,background:"rgba(100,116,139,0.12)"}}/>
             <div>
-              <div style={{fontSize:7,color:"#475569",letterSpacing:".2em"}}>HR</div>
+              <div style={{fontSize:10,color:"#475569",letterSpacing:".2em"}}>HR</div>
               <div style={{display:"flex",alignItems:"baseline",gap:4,marginTop:1}}>
                 <PulsingHeart bpm={current.bpm} color={current.color}/>
-                <span style={{fontSize:18,fontWeight:700,color:current.bpm>0?"#34d399":"#ef4444",lineHeight:1}}>{current.bpm>0?current.bpm:"—"}</span>
-                <span style={{fontSize:7,color:"#475569"}}>{current.bpm>0?"bpm":"arrest"}</span>
+                <span style={{fontSize:24,fontWeight:700,color:current.bpm>0?"#34d399":"#ef4444",lineHeight:1}}>{current.bpm>0?current.bpm:"—"}</span>
+                <span style={{fontSize:10,color:"#475569"}}>{current.bpm>0?"bpm":"arrest"}</span>
               </div>
             </div>
             <div style={{width:1,height:22,background:"rgba(100,116,139,0.12)"}}/>
-            <span style={{fontSize:9,fontWeight:600,padding:"2px 8px",borderRadius:8,background:`${current.color}12`,color:current.color,border:`1px solid ${current.color}20`}}>{current.category}</span>
+            <span style={{fontSize:12,fontWeight:600,padding:"2px 8px",borderRadius:8,background:`${current.color}12`,color:current.color,border:`1px solid ${current.color}20`}}>{current.category}</span>
             <ShockBadge shockable={current.shockable}/>
             <div style={{flex:1}}/>
             <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
@@ -673,10 +673,10 @@ export default function ECGSimulatorGuide() {
               </div>
               <div style={{borderRadius:8,overflow:"hidden",marginBottom:8,border:"1px solid rgba(52,211,153,0.1)",position:"relative",boxShadow:"0 0 30px rgba(52,211,153,0.03)"}}>
                 <ECGCanvas rhythm={rhythm} isRunning={isRunning} speed={speed} height={isMobile?180:220} leadName={selectedLead}/>
-                <div style={{position:"absolute",top:7,left:10,fontSize:10,color:"#34d399",fontWeight:600,opacity:.6,letterSpacing:".1em"}}>{selectedLead}</div>
-                <div style={{position:"absolute",top:7,right:10,fontSize:7,color:"#475569"}}>25 mm/s · 10 mm/mV</div>
-                <div style={{position:"absolute",bottom:7,left:10,fontSize:7,color:"#475569"}}>{current.abbr}</div>
-                {current.bpm===0&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:13,fontWeight:700,color:"#ef4444",letterSpacing:".15em",textShadow:"0 0 20px rgba(239,68,68,0.5)"}}>NO OUTPUT</div>}
+                <div style={{position:"absolute",top:7,left:10,fontSize:13,color:"#34d399",fontWeight:600,opacity:.6,letterSpacing:".1em"}}>{selectedLead}</div>
+                <div style={{position:"absolute",top:7,right:10,fontSize:10,color:"#475569"}}>25 mm/s · 10 mm/mV</div>
+                <div style={{position:"absolute",bottom:7,left:10,fontSize:10,color:"#475569"}}>{current.abbr}</div>
+                {current.bpm===0&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:16,fontWeight:700,color:"#ef4444",letterSpacing:".15em",textShadow:"0 0 20px rgba(239,68,68,0.5)"}}>NO OUTPUT</div>}
               </div>
             </>
           )}
@@ -687,7 +687,7 @@ export default function ECGSimulatorGuide() {
               {LEAD_NAMES.map(l=>(
                 <div key={l} style={{borderRadius:6,overflow:"hidden",border:"1px solid rgba(52,211,153,0.08)",position:"relative"}}>
                   <MiniECGCanvas rhythm={rhythm} isRunning={isRunning} speed={speed} leadName={l} height={isMobile?55:70}/>
-                  <div style={{position:"absolute",top:3,left:5,fontSize:8,color:"#34d399",fontWeight:600,opacity:.7}}>{l}</div>
+                  <div style={{position:"absolute",top:3,left:5,fontSize:11,color:"#34d399",fontWeight:600,opacity:.7}}>{l}</div>
                 </div>
               ))}
             </div>
@@ -701,51 +701,51 @@ export default function ECGSimulatorGuide() {
 
           {tab==="clinical" && (
             <div key={rhythm} style={{padding:"12px 14px",borderRadius:8,marginBottom:10,background:"rgba(15,23,42,0.4)",border:"1px solid rgba(100,116,139,0.06)",animation:"fade-up .3s ease"}}>
-              <div style={{fontSize:7,color:"#475569",letterSpacing:".2em",marginBottom:5}}>CLINICAL OVERVIEW</div>
-              <p style={{fontSize:11,color:"#cbd5e1",lineHeight:1.8,margin:"0 0 10px"}}>{current.description}</p>
-              <div style={{fontSize:7,color:"#475569",letterSpacing:".2em",marginBottom:5}}>KEY FEATURES</div>
+              <div style={{fontSize:10,color:"#475569",letterSpacing:".2em",marginBottom:5}}>CLINICAL OVERVIEW</div>
+              <p style={{fontSize:14,color:"#cbd5e1",lineHeight:1.8,margin:"0 0 10px"}}>{current.description}</p>
+              <div style={{fontSize:10,color:"#475569",letterSpacing:".2em",marginBottom:5}}>KEY FEATURES</div>
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:3,marginBottom:10}}>
                 {current.keyFeatures.map((f,i)=>(
-                  <div key={i} style={{padding:"4px 9px",borderRadius:4,background:`${current.color}06`,border:`1px solid ${current.color}10`,fontSize:9.5,color:"#94a3b8",display:"flex",alignItems:"center",gap:5}}>
-                    <span style={{color:current.color,fontSize:5}}>◆</span>{f}
+                  <div key={i} style={{padding:"4px 9px",borderRadius:4,background:`${current.color}06`,border:`1px solid ${current.color}10`,fontSize:12,color:"#94a3b8",display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{color:current.color,fontSize:7}}>◆</span>{f}
                   </div>
                 ))}
               </div>
               {current.shockable!==null && (
                 <div style={{padding:"8px 11px",borderRadius:6,marginBottom:8,background:current.shockable?"rgba(239,68,68,0.05)":"rgba(100,116,139,0.05)",border:`1px solid ${current.shockable?"rgba(239,68,68,0.15)":"rgba(100,116,139,0.1)"}`}}>
-                  <div style={{fontSize:7,color:"#475569",letterSpacing:".15em",marginBottom:3}}>ACLS CLASSIFICATION</div>
+                  <div style={{fontSize:10,color:"#475569",letterSpacing:".15em",marginBottom:3}}>ACLS CLASSIFICATION</div>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <ShockBadge shockable={current.shockable}/>
-                    <span style={{fontSize:10,color:"#94a3b8"}}>{current.shockable?"Defibrillation indicated — follow VFib/pVT algorithm":"Do NOT defibrillate — CPR + epinephrine per asystole/PEA algorithm"}</span>
+                    <span style={{fontSize:13,color:"#94a3b8"}}>{current.shockable?"Defibrillation indicated — follow VFib/pVT algorithm":"Do NOT defibrillate — CPR + epinephrine per asystole/PEA algorithm"}</span>
                   </div>
                 </div>
               )}
               <div style={{padding:"8px 11px",borderRadius:6,background:"rgba(52,211,153,0.02)",borderLeft:`2px solid ${current.color}30`,marginBottom:8}}>
-                <div style={{fontSize:7,color:"#475569",letterSpacing:".15em",marginBottom:2}}>CLINICAL PEARL</div>
-                <div style={{fontSize:10.5,color:"#94a3b8",lineHeight:1.7}}>{current.clinicalNote}</div>
+                <div style={{fontSize:10,color:"#475569",letterSpacing:".15em",marginBottom:2}}>CLINICAL PEARL</div>
+                <div style={{fontSize:13,color:"#94a3b8",lineHeight:1.7}}>{current.clinicalNote}</div>
               </div>
-              <div style={{fontSize:8.5,color:"#475569",fontStyle:"italic"}}>Ref: {current.reference}</div>
+              <div style={{fontSize:11,color:"#475569",fontStyle:"italic"}}>Ref: {current.reference}</div>
             </div>
           )}
 
           {tab==="waves" && (
             <div style={{padding:"12px 14px",borderRadius:8,marginBottom:10,background:"rgba(15,23,42,0.3)",border:"1px solid rgba(100,116,139,0.05)",animation:"fade-up .3s ease"}}>
-              <div style={{fontSize:7,color:"#475569",letterSpacing:".2em",marginBottom:8}}>ECG WAVEFORM COMPONENTS</div>
+              <div style={{fontSize:10,color:"#475569",letterSpacing:".2em",marginBottom:8}}>ECG WAVEFORM COMPONENTS</div>
               <div style={{display:"flex",flexDirection:"column",gap:3}}>
                 {WAVE_COMPONENTS.map(w=>{const open=expandedWave===w.id;return(
                   <button key={w.id} className="wave-card" onClick={()=>setExpandedWave(open?null:w.id)} style={open?{borderColor:`${w.color}30`,background:"rgba(15,23,42,0.45)"}:{}}>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <div style={{width:22,height:22,borderRadius:4,background:`${w.color}12`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:700,color:w.color}}>{w.id}</div>
-                        <span style={{fontSize:10.5,fontWeight:open?600:400,color:open?w.color:"#94a3b8"}}>{w.label}</span>
+                        <div style={{width:22,height:22,borderRadius:4,background:`${w.color}12`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:w.color}}>{w.id}</div>
+                        <span style={{fontSize:13,fontWeight:open?600:400,color:open?w.color:"#94a3b8"}}>{w.label}</span>
                       </div>
-                      <span style={{fontSize:9,color:"#475569",transform:open?"rotate(90deg)":"none",transition:"transform .2s"}}>▸</span>
+                      <span style={{fontSize:12,color:"#475569",transform:open?"rotate(90deg)":"none",transition:"transform .2s"}}>▸</span>
                     </div>
                     {open&&(<div style={{marginTop:7,paddingTop:7,borderTop:`1px solid ${w.color}12`,animation:"fade-up .2s ease"}}>
-                      <p style={{fontSize:10,color:"#94a3b8",lineHeight:1.7,margin:"0 0 6px"}}>{w.desc}</p>
+                      <p style={{fontSize:13,color:"#94a3b8",lineHeight:1.7,margin:"0 0 6px"}}>{w.desc}</p>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                        <span style={{padding:"2px 8px",borderRadius:3,background:`${w.color}08`,fontSize:8.5,color:"#64748b"}}><span style={{color:w.color}}>Duration:</span> {w.duration}</span>
-                        <span style={{padding:"2px 8px",borderRadius:3,background:`${w.color}08`,fontSize:8.5,color:"#64748b"}}><span style={{color:w.color}}>Amplitude:</span> {w.amplitude}</span>
+                        <span style={{padding:"2px 8px",borderRadius:3,background:`${w.color}08`,fontSize:11,color:"#64748b"}}><span style={{color:w.color}}>Duration:</span> {w.duration}</span>
+                        <span style={{padding:"2px 8px",borderRadius:3,background:`${w.color}08`,fontSize:11,color:"#64748b"}}><span style={{color:w.color}}>Amplitude:</span> {w.amplitude}</span>
                       </div>
                     </div>)}
                   </button>
