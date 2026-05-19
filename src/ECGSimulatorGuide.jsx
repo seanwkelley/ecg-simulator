@@ -51,6 +51,129 @@ const RHYTHM_LEAD_OVERRIDES = {
     V3: { tAmp:1.5, tInv:false },
     V4: { tAmp:1.3, tInv:false },
   },
+
+  // ── STEMI: anterior wall (LAD) — ST↑ V1-V4, reciprocal ST↓ inferior ──
+  stemi_anterior: {
+    V1: { stShift: 0.35, stShape: "convex", tAmp: 0.6 },
+    V2: { stShift: 0.55, stShape: "convex", tAmp: 0.9, rAmp: 0.4 },
+    V3: { stShift: 0.60, stShape: "convex", tAmp: 1.0, rAmp: 0.5 },
+    V4: { stShift: 0.45, stShape: "convex", tAmp: 0.9 },
+    II:  { stShift: -0.15 },
+    III: { stShift: -0.20 },
+    aVF: { stShift: -0.18 },
+    aVR: { stShift: -0.10 },
+  },
+  // ── STEMI: inferior wall (RCA) — ST↑ II/III/aVF, reciprocal ST↓ I/aVL ──
+  stemi_inferior: {
+    II:  { stShift: 0.40, stShape: "convex", bigQ: true, tAmp: 0.9 },
+    III: { stShift: 0.55, stShape: "convex", bigQ: true, tAmp: 1.0 },
+    aVF: { stShift: 0.45, stShape: "convex", bigQ: true, tAmp: 0.9 },
+    I:   { stShift: -0.25 },
+    aVL: { stShift: -0.30 },
+    V1:  { stShift: -0.10 },
+    V2:  { stShift: -0.15 },
+  },
+  // ── STEMI: lateral (Cx/D1) — ST↑ I/aVL/V5/V6 ──
+  stemi_lateral: {
+    I:   { stShift: 0.30, stShape: "convex", tAmp: 0.9 },
+    aVL: { stShift: 0.40, stShape: "convex", tAmp: 1.0, bigQ: true },
+    V5:  { stShift: 0.30, stShape: "convex", tAmp: 0.9 },
+    V6:  { stShift: 0.28, stShape: "convex", tAmp: 0.9 },
+    II:  { stShift: -0.15 },
+    III: { stShift: -0.25 },
+    aVF: { stShift: -0.20 },
+  },
+  // ── STEMI: posterior — tall R + ST↓ + upright T in V1-V3 (mirror) ──
+  stemi_posterior: {
+    V1: { rAmp: 1.0, sD: 0.05, stShift: -0.35, stShape: "flat", tAmp: 0.9, tInv: false },
+    V2: { rAmp: 1.2, sD: 0.05, stShift: -0.45, stShape: "flat", tAmp: 1.0, tInv: false },
+    V3: { rAmp: 1.0, sD: 0.10, stShift: -0.30, stShape: "flat", tAmp: 0.9, tInv: false },
+    II:  { stShift: 0.10, bigQ: true },  // often co-existing inferior
+    III: { stShift: 0.15, bigQ: true },
+    aVF: { stShift: 0.12, bigQ: true },
+  },
+  // ── STEMI: right ventricular (proximal RCA) — ST↑ V1 + inferior ──
+  stemi_rv: {
+    V1: { stShift: 0.35, stShape: "convex", tAmp: 0.7, rAmp: 0.4 },
+    II:  { stShift: 0.35, stShape: "convex", bigQ: true, tAmp: 0.8 },
+    III: { stShift: 0.50, stShape: "convex", bigQ: true, tAmp: 1.0 }, // III ↑ > II ↑
+    aVF: { stShift: 0.40, stShape: "convex", bigQ: true, tAmp: 0.9 },
+    I:   { stShift: -0.20 },
+    aVL: { stShift: -0.25 },
+  },
+  // ── Wellens (LAD critical stenosis, pain-free) ──
+  // Type A biphasic in V2-V3; type B deep symmetric inversion V1-V4
+  wellens: {
+    V2: { biphasicT: true, tAmp: 1.4 },
+    V3: { biphasicT: true, tAmp: 1.4 },
+    V1: { tInv: true, tAmp: 0.8 },
+    V4: { tInv: true, tAmp: 0.7 },
+  },
+  // ── De Winter T waves (LAD occlusion equivalent) ──
+  // Upsloping ST↓ at J-point with tall symmetric T in precordials
+  dewinter: {
+    V1: { stShift: -0.20, stShape: "upslope", peakedT: true, tAmp: 1.2 },
+    V2: { stShift: -0.25, stShape: "upslope", peakedT: true, tAmp: 1.5 },
+    V3: { stShift: -0.25, stShape: "upslope", peakedT: true, tAmp: 1.6 },
+    V4: { stShift: -0.20, stShape: "upslope", peakedT: true, tAmp: 1.4 },
+    V5: { stShift: -0.15, stShape: "upslope", peakedT: true, tAmp: 1.1 },
+  },
+  // ── Pericarditis — diffuse concave ST↑ + PR depression ──
+  pericarditis: {
+    I:   { stShift: 0.18, stShape: "concave", prDepress: 0.06 },
+    II:  { stShift: 0.22, stShape: "concave", prDepress: 0.08 },
+    III: { stShift: 0.12, stShape: "concave", prDepress: 0.06 },
+    aVF: { stShift: 0.18, stShape: "concave", prDepress: 0.06 },
+    aVL: { stShift: 0.10, stShape: "concave", prDepress: 0.05 },
+    aVR: { stShift: -0.18, prDepress: -0.10 }, // PR elevation in aVR — knuckle sign
+    V2:  { stShift: 0.18, stShape: "concave", prDepress: 0.06 },
+    V3:  { stShift: 0.25, stShape: "concave", prDepress: 0.07 },
+    V4:  { stShift: 0.22, stShape: "concave", prDepress: 0.06 },
+    V5:  { stShift: 0.18, stShape: "concave", prDepress: 0.05 },
+    V6:  { stShift: 0.14, stShape: "concave", prDepress: 0.05 },
+  },
+  // ── Brugada Type 1 — coved ST↑ + TWI in V1-V2 ──
+  brugada: {
+    V1: { stShift: 0.30, stShape: "coved", tInv: true, tAmp: 0.7, rAmp: 0.5, sD: 0.1 },
+    V2: { stShift: 0.35, stShape: "coved", tInv: true, tAmp: 0.7, rAmp: 0.6, sD: 0.1 },
+  },
+  // ── Hypothermia — Osborn / J wave in lateral leads ──
+  hypothermia: {
+    I:   { jWave: 0.20 },
+    II:  { jWave: 0.25 },
+    aVF: { jWave: 0.18 },
+    V4:  { jWave: 0.25 },
+    V5:  { jWave: 0.28 },
+    V6:  { jWave: 0.25 },
+  },
+  // ── Hypokalaemia — flat T + prominent U + mild ST↓ ──
+  hypokalemia: {
+    II: { tAmp: 0.4, stShift: -0.06, uWave: 0.16 },
+    V2: { tAmp: 0.4, stShift: -0.08, uWave: 0.20 },
+    V3: { tAmp: 0.4, stShift: -0.08, uWave: 0.22 },
+    V4: { tAmp: 0.4, stShift: -0.06, uWave: 0.18 },
+    V5: { tAmp: 0.5, stShift: -0.05, uWave: 0.14 },
+  },
+  // ── Digoxin effect — scooped/sagging ST↓ ("Salvador Dalí mustache") ──
+  digoxin_effect: {
+    II: { stShift: -0.12, stShape: "scoop", tAmp: 0.5 },
+    V5: { stShift: -0.15, stShape: "scoop", tAmp: 0.5 },
+    V6: { stShift: -0.13, stShape: "scoop", tAmp: 0.5 },
+  },
+  // ── WPW — delta wave (lateral leads have biggest delta with LV-side accessory) ──
+  wpw: {
+    I:   { deltaWave: 0.6 },
+    II:  { deltaWave: 0.7 },
+    aVL: { deltaWave: 0.5 },
+    V4:  { deltaWave: 0.8 },
+    V5:  { deltaWave: 0.7 },
+    V6:  { deltaWave: 0.6 },
+  },
+  // ── RV-paced (LBBB-like wide QRS + spike) ──
+  paced_ventricular: {
+    V1: { rAmp: 0.2, sD: 0.8, tInv: false, tAmp: 0.6 },
+    V6: { rAmp: 1.0, sD: 0.05, tInv: true, tAmp: 0.6 },
+  },
 };
 
 const RHYTHMS = {
@@ -214,6 +337,164 @@ const RHYTHMS = {
     clinicalNote: "Suggests greater myocardial irritability. More common in structural heart disease, electrolyte abnormalities (K⁺, Mg²⁺), drug toxicity. Requires workup.",
     reference: "Goldberger, Clinical ECG, Ch. 17",
   },
+
+  /* ═══ ISCHEMIA / INFARCTION ═══ */
+  stemi_anterior: {
+    name: "Anterior STEMI (LAD)", abbr: "Ant-STEMI", bpm: 88, category: "Ischemia", color: "#ef4444",
+    shockable: null,
+    description: "Occlusion of the LAD. Convex ('tombstone') ST elevation across the precordial leads V1–V4 with reciprocal ST depression inferiorly (II, III, aVF). R-wave amplitude is reduced over the infarct zone.",
+    keyFeatures: ["ST↑ V1–V4 (convex / tombstone)","Reciprocal ST↓ in II, III, aVF","Loss of R wave progression","High mortality — large myocardial territory"],
+    clinicalNote: "Time = muscle. Activate cath lab; goal door-to-balloon < 90 min. Dual antiplatelet + anticoagulation per guidelines. Anterior STEMI has the worst prognosis of all STEMI territories.",
+    reference: "AHA/ACC 2013 STEMI Guidelines; Burns, LITFL — Anterior STEMI",
+  },
+  stemi_inferior: {
+    name: "Inferior STEMI (RCA)", abbr: "Inf-STEMI", bpm: 70, category: "Ischemia", color: "#dc2626",
+    shockable: null,
+    description: "Occlusion of the right coronary artery (or LCx in left-dominant). ST elevation in II, III, aVF with reciprocal ST depression in I and aVL. III > II elevation suggests RCA over LCx.",
+    keyFeatures: ["ST↑ in II, III, aVF","Reciprocal ST↓ in I, aVL","III ↑ > II ↑ → RCA culprit","Check V4R for RV involvement"],
+    clinicalNote: "Often bradycardic (RCA supplies SA/AV nodes). AVOID nitrates if RV infarct (preload-dependent → hypotension). Atropine for symptomatic brady. Get right-sided leads (V4R).",
+    reference: "Burns, LITFL — Inferior STEMI",
+  },
+  stemi_lateral: {
+    name: "Lateral STEMI (Cx / D1)", abbr: "Lat-STEMI", bpm: 85, category: "Ischemia", color: "#f43f5e",
+    shockable: null,
+    description: "Occlusion of the circumflex or first diagonal branch. ST elevation in lateral leads (I, aVL ± V5–V6) with reciprocal depression in inferior leads.",
+    keyFeatures: ["ST↑ in I, aVL, V5, V6","Reciprocal ST↓ in II, III, aVF","Q wave in aVL with first diagonal occlusion","Often subtle — easy to miss"],
+    clinicalNote: "Isolated high-lateral STEMI (I + aVL only) is the most commonly missed STEMI on initial ECG read. South African flag sign: ST↑ I, aVL, V2 + ST↓ III → first diagonal occlusion.",
+    reference: "Littmann, J Electrocardiol 2016 (S.A. flag sign); LITFL — Lateral STEMI",
+  },
+  stemi_posterior: {
+    name: "Posterior STEMI", abbr: "Post-STEMI", bpm: 80, category: "Ischemia", color: "#be123c",
+    shockable: null,
+    description: "Posterior wall infarct (LCx or RPDA branch). Shows as 'mirror image' in anterior leads: tall R, ST depression, and upright T in V1–V3. Confirm with posterior leads V7–V9 (ST↑ ≥ 0.5 mm).",
+    keyFeatures: ["Tall R wave in V1–V2 (R > S)","Horizontal ST↓ in V1–V3","Upright T waves in V1–V3","Confirm with V7–V9 (ST↑)"],
+    clinicalNote: "ST depression in V1–V3 should always prompt posterior lead placement. ~15–20% of inferior STEMIs extend posteriorly. Treat as STEMI — get to cath lab.",
+    reference: "Burns, LITFL — Posterior STEMI",
+  },
+  stemi_rv: {
+    name: "RV STEMI (proximal RCA)", abbr: "RV-STEMI", bpm: 70, category: "Ischemia", color: "#9f1239",
+    shockable: null,
+    description: "Right ventricular infarct from proximal RCA occlusion. Inferior STEMI pattern PLUS ST↑ in V1 (and confirmed in V4R). III ↑ > II ↑ is the giveaway.",
+    keyFeatures: ["Inferior STEMI features","ST↑ in V1 (anterior precordial)","III ↑ > II ↑","ST↑ in V4R confirms diagnosis"],
+    clinicalNote: "RV infarct = preload-dependent state. AVOID nitrates and opioids. Give IV fluids for hypotension. Pacing may be needed for bradyarrhythmias.",
+    reference: "Wellens, Heart 1999; LITFL — RV Infarction",
+  },
+  wellens: {
+    name: "Wellens Syndrome", abbr: "Wellens", bpm: 75, category: "Ischemia", color: "#fb7185",
+    shockable: null,
+    description: "Critical proximal LAD stenosis with pain-free interval. Type A (25%): biphasic T waves in V2–V3. Type B (75%): deeply symmetric inverted T waves in V2–V3 (sometimes V1–V4). Preserved R waves, no Q waves, no ST elevation.",
+    keyFeatures: ["Biphasic or deep symmetric TWI in V2–V3","Recent angina (now pain-free)","Preserved R wave progression","No Q waves, minimal/no ST↑"],
+    clinicalNote: "High-risk pattern — impending anterior STEMI within days. Stress testing is contraindicated. Patient needs urgent coronary angiography, not a treadmill.",
+    reference: "de Zwaan, Wellens, Am Heart J 1982; LITFL — Wellens",
+  },
+  dewinter: {
+    name: "De Winter T Waves", abbr: "DeWinter", bpm: 95, category: "Ischemia", color: "#f87171",
+    shockable: null,
+    description: "Anterior STEMI equivalent: ~2% of LAD occlusions. Upsloping ST depression at the J point in V1–V6, continuing into tall, prominent, symmetric T waves. Often with subtle ST↑ in aVR.",
+    keyFeatures: ["Upsloping ST↓ at J point in precordials","Tall symmetric T waves V1–V6","Often subtle ST↑ in aVR","No frank ST↑ — easy to miss"],
+    clinicalNote: "Treat as STEMI — activate cath lab. Considered a STEMI equivalent in current OMI/NOMI paradigm. May persist throughout occlusion without evolving into classic ST↑.",
+    reference: "de Winter et al., NEJM 2008; LITFL — De Winter T waves",
+  },
+  pericarditis: {
+    name: "Acute Pericarditis", abbr: "Pericard", bpm: 95, category: "Ischemia", color: "#fb923c",
+    shockable: null,
+    description: "Inflammation of the pericardium. Stage 1 ECG: diffuse concave-up ST elevation (excluding aVR and V1) with PR depression. Reciprocal changes in aVR (ST↓ and PR↑ — 'knuckle sign'). No reciprocal ST↓ otherwise; no Q waves.",
+    keyFeatures: ["Diffuse concave-up ST↑","PR depression (PR↑ in aVR)","No reciprocal ST↓","No Q waves, preserved R waves"],
+    clinicalNote: "Spodick sign (downsloping TP segment) supports diagnosis. NSAIDs + colchicine first-line. Look for effusion / tamponade. Distinguish from STEMI (focal, convex ST↑) and benign early repolarisation (J-point notch).",
+    reference: "Imazio et al., NEJM 2013; LITFL — Pericarditis",
+  },
+
+  /* ═══ CHANNELOPATHIES / METABOLIC ═══ */
+  brugada: {
+    name: "Brugada Syndrome (Type 1)", abbr: "Brugada", bpm: 75, category: "Conduction", color: "#a855f7",
+    shockable: null,
+    description: "Sodium channel (SCN5A) loss-of-function channelopathy. Type 1 ('coved'): ≥ 2 mm coved ST elevation in V1–V2 descending into a negative T wave. May be unmasked by fever, sodium-channel blockers, vagal tone.",
+    keyFeatures: ["Coved ST↑ ≥ 2 mm in V1–V2","T-wave inversion follows ST","Pseudo-RBBB pattern (no wide S in V6)","Risk of polymorphic VT / SCD"],
+    clinicalNote: "ICD for symptomatic patients (syncope, aborted SCD) or inducible VF on EP study. AVOID Brugada-aggravating drugs (Class I antiarrhythmics, propofol, TCAs). Treat fever aggressively.",
+    reference: "Brugada & Brugada, JACC 1992; Priori et al., 2015 HRS Consensus",
+  },
+  hyperkalemia_mild: {
+    name: "Hyperkalaemia — Tall T Waves", abbr: "K↑ mild", bpm: 75, category: "Metabolic", color: "#fbbf24",
+    shockable: null,
+    description: "K⁺ ~5.5–6.5 mmol/L. Early ECG change: tall, narrow, peaked ('tented') T waves with a narrow base. Best seen in precordial leads. Repolarisation accelerates.",
+    keyFeatures: ["Tall narrow peaked T waves","Symmetric, pointed peak","Shortened QT","Best seen in V2–V4"],
+    clinicalNote: "Verify K⁺ urgently. Treat if symptomatic or K⁺ > 6.0: IV calcium (membrane stabilisation), insulin/dextrose, salbutamol, then K⁺ removal (resin / dialysis / loop diuretic).",
+    reference: "Mattu et al., Am J Emerg Med 2000; LITFL — Hyperkalaemia",
+  },
+  hyperkalemia_severe: {
+    name: "Hyperkalaemia — Sine Wave", abbr: "K↑ pre-arrest", bpm: 60, category: "Emergency", color: "#dc2626",
+    shockable: false,
+    description: "K⁺ > 8 mmol/L. Pre-arrest pattern. P waves disappear, QRS broadens progressively, eventually fusing with the T wave to form a sine wave. Imminent VF or asystole.",
+    keyFeatures: ["No P waves","Very wide QRS fused with T","Sinusoidal pattern","Imminent cardiac arrest"],
+    clinicalNote: "Immediate IV calcium chloride 1 g (or gluconate 3 g) — works in seconds. Then insulin/dextrose, salbutamol, bicarbonate, urgent dialysis. Cardiac monitoring continuously. CPR if arrest.",
+    reference: "Burns, LITFL — Hyperkalaemia: Sine Wave",
+  },
+  hypokalemia: {
+    name: "Hypokalaemia", abbr: "K↓", bpm: 80, category: "Metabolic", color: "#fcd34d",
+    shockable: null,
+    description: "K⁺ < 3.5 mmol/L. Repolarisation is delayed: flattening / inversion of T waves, ST depression, and the appearance of prominent U waves (best seen in V2–V3). Apparent QT prolongation (actually merged QU interval).",
+    keyFeatures: ["Flat / inverted T waves","ST depression","Prominent U waves (V2–V3)","Apparent long QT (QU fusion)"],
+    clinicalNote: "Replace K⁺ — orally if possible, IV if severe / symptomatic / arrhythmia. Always check Mg²⁺ (hypokalaemia is refractory until Mg²⁺ is replaced). Risk of digoxin toxicity, torsades.",
+    reference: "Diercks et al., J Emerg Med 2004; LITFL — Hypokalaemia",
+  },
+  hypothermia: {
+    name: "Hypothermia (Osborn Waves)", abbr: "Hypotherm", bpm: 45, category: "Metabolic", color: "#22d3ee",
+    shockable: null,
+    description: "Core temp < 32 °C produces the Osborn (J) wave: a positive deflection at the J point, like a 'camel hump' on the end of the QRS. Amplitude proportional to severity. Bradycardia, prolonged intervals, and shivering artefact common.",
+    keyFeatures: ["Osborn (J) wave at end of QRS","Bradycardia, slow AF common","Prolonged PR, QRS, QT","Shivering artefact on baseline"],
+    clinicalNote: "Handle gently — irritable myocardium prone to VF. Rewarm (passive → active external → core). Defibrillation often unsuccessful until temp > 30 °C. 'Not dead until warm and dead.'",
+    reference: "Osborn, Am J Physiol 1953; LITFL — Hypothermia",
+  },
+  digoxin_effect: {
+    name: "Digoxin Effect (Therapeutic)", abbr: "Dig effect", bpm: 65, category: "Metabolic", color: "#86efac",
+    shockable: null,
+    description: "Therapeutic digoxin produces a characteristic scooped, downsloping ('Salvador Dalí mustache') ST depression — best seen in lateral leads — with shortened QT and flattened/inverted T waves. NOT a sign of toxicity.",
+    keyFeatures: ["Scooped / sagging ST↓","Flat or inverted T waves","Shortened QT interval","Prominent U waves possible"],
+    clinicalNote: "Reflects therapeutic effect, NOT toxicity. Dig TOXICITY is suggested by any arrhythmia in a patient on dig (classically: atrial tach with block, bidirectional VT, junctional rhythms). Check level, treat with DigiFab.",
+    reference: "Ma et al., Crit Care Med 2001; LITFL — Digoxin Effect / Toxicity",
+  },
+
+  /* ═══ PRE-EXCITATION / PACED / ESCAPE ═══ */
+  wpw: {
+    name: "WPW Pre-excitation", abbr: "WPW", bpm: 75, category: "Arrhythmia", color: "#c084fc",
+    shockable: null,
+    description: "Accessory pathway (bundle of Kent) bypasses the AV node. Triad: short PR (< 120 ms), delta wave (slurred QRS upstroke), wide QRS (> 110 ms). Predisposes to AVRT (orthodromic narrow / antidromic wide) and pre-excited AF.",
+    keyFeatures: ["Short PR < 120 ms","Delta wave (slurred upstroke)","Wide QRS > 110 ms","Secondary ST-T changes"],
+    clinicalNote: "Pre-excited AF (irregular, broad, fast — sometimes > 250 bpm) is a medical emergency: AV-nodal blockers (adenosine, verapamil, digoxin) are CONTRAINDICATED — they accelerate accessory pathway conduction → VF. Use procainamide / cardioversion.",
+    reference: "Wolff, Parkinson, White, Am Heart J 1930; LITFL — WPW",
+  },
+  paced_ventricular: {
+    name: "Ventricular Paced Rhythm", abbr: "V-paced", bpm: 70, category: "Paced", color: "#60a5fa",
+    shockable: null,
+    description: "RV apical pacing produces a sharp pacing spike followed by a wide QRS with an LBBB-like morphology (RV is depolarised first, LV follows late via cell-to-cell conduction). Underlying intrinsic rhythm may or may not be visible.",
+    keyFeatures: ["Pacing spike before every QRS","Wide QRS, LBBB-like morphology","Appropriate ST-T discordance","Capture confirmed by QRS after each spike"],
+    clinicalNote: "Modified Sgarbossa (Smith) criteria are used to diagnose acute MI in paced rhythm. Failure to capture (spike without QRS), failure to sense (spikes in inappropriate places), or no spikes at all all suggest pacemaker malfunction.",
+    reference: "Sgarbossa et al., NEJM 1996; LITFL — Pacemaker Rhythms",
+  },
+  paced_dual: {
+    name: "Dual-Chamber Paced (DDD)", abbr: "DDD", bpm: 75, category: "Paced", color: "#3b82f6",
+    shockable: null,
+    description: "Atrial pacing spike → P wave → ventricular pacing spike → wide QRS. Both chambers are paced sequentially, preserving AV synchrony.",
+    keyFeatures: ["Atrial spike before each P","Ventricular spike before each QRS","Wide LBBB-like QRS","AV delay preserved"],
+    clinicalNote: "Indications: AV block with preserved sinus node function, sinus node dysfunction. Mode-switching prevents tracking of atrial arrhythmias. Pacemaker syndrome occurs with loss of AV synchrony in single-chamber pacing.",
+    reference: "Bernstein et al., PACE 2002 (NBG code); LITFL — DDD pacing",
+  },
+  junctional_escape: {
+    name: "Junctional Escape", abbr: "Junct", bpm: 45, category: "Bradycardia", color: "#94a3b8",
+    shockable: null,
+    description: "AV junctional pacemaker takes over when the SA node fails or AV conduction is blocked. Rate 40–60 bpm. Narrow QRS. P waves either absent, inverted (retrograde, after QRS), or buried in the QRS.",
+    keyFeatures: ["Rate 40–60 bpm","Narrow QRS","Inverted / absent / retrograde P","Regular rhythm"],
+    clinicalNote: "Symptomatic? Atropine first. Look for the cause: drug effect (β-blocker, dig), inferior MI, sick sinus, hyperkalaemia. May need pacing if persistent and symptomatic.",
+    reference: "Goldberger, Clinical ECG, Ch. 14; LITFL — Junctional Escape",
+  },
+  aivr: {
+    name: "AIVR (Accelerated Idioventricular)", abbr: "AIVR", bpm: 75, category: "Arrhythmia", color: "#fb923c",
+    shockable: null,
+    description: "Ventricular escape rhythm at 40–110 bpm (faster than the intrinsic ventricular rate of 20–40, slower than VT > 100). Regular, wide QRS, no P waves. Classic 'reperfusion rhythm' after successful thrombolysis or PCI.",
+    keyFeatures: ["Rate 40–110 bpm","Wide regular QRS","No P waves","Often self-terminating"],
+    clinicalNote: "Usually benign and self-limiting — DO NOT treat as VT. Hallmark sign of successful reperfusion in acute MI. Avoid antiarrhythmics: suppressing AIVR may unmask a slower escape that's haemodynamically worse.",
+    reference: "Riera et al., Indian Pacing Electrophysiol J 2010; LITFL — AIVR",
+  },
 };
 
 const WAVE_COMPONENTS = [
@@ -225,40 +506,137 @@ const WAVE_COMPONENTS = [
   { id:"QT", label:"QT Interval", color:"#f472b6", desc:"Total ventricular electrical systole. QTc = QT/√RR. Prolonged QTc (>440M, >460F) → Torsades risk. Causes: drugs, electrolytes, congenital LQTS.", duration:"QTc < 440–460 ms", amplitude:"—" },
 ];
 
-const CATEGORIES = ["All","Normal","Bradycardia","Tachycardia","Arrhythmia","Conduction","Emergency"];
+const CATEGORIES = ["All","Normal","Bradycardia","Tachycardia","Arrhythmia","Conduction","Ischemia","Metabolic","Paced","Emergency"];
 
 /* ═══════════════════ WAVEFORM GENERATOR ═══════════════════ */
 
+// Polarity controls QRS/P/T flip (axis-driven, e.g. aVR).
+// ST shift / U / J / delta / pacing-spike overlays are absolute — they encode
+// the directly-visible-on-screen direction in that lead, so they are NOT
+// multiplied by polarity (otherwise a manually specified reciprocal ST↓ in
+// aVR would invert and read as elevation).
 function normalBeat(phase, opts = {}) {
-  const { prDelay=0, qrsWidth=1, rAmp=1, pAmp=1, tAmp=1, qrsNotch=false, deepS=false, bigQ=false, tInvert=false, longQT=false } = opts;
+  const {
+    prDelay = 0, qrsWidth = 1, rAmp = 1, pAmp = 1, tAmp = 1,
+    qrsNotch = false, deepS = false, bigQ = false, tInvert = false, longQT = false,
+    polarity = 1,
+    stShift = 0,           // mV-equivalent vertical ST baseline offset (+ = elevation)
+    stShape = "flat",      // "flat" | "concave" | "convex" | "scoop" | "coved" | "upslope"
+    prDepress = 0,         // PR-segment depression (pericarditis)
+    uWave = 0,             // U-wave amplitude (hypokalaemia)
+    jWave = 0,             // Osborn wave amplitude (hypothermia)
+    deltaWave = 0,         // pre-excitation slurred upstroke (WPW)
+    pacingSpike = false,   // ventricular pacing spike before QRS
+    atrialSpike = false,   // atrial pacing spike before P
+    biphasicT = false,     // Wellens Type A biphasic T
+    deWinter = false,      // upsloping ST↓ + tall symmetric T
+    sineWaveQRS = false,   // late hyperK fused QRS-T sine
+    peakedT = false,       // hyperK tall narrow T
+    pWaveInverted = false, // junctional retrograde P
+    suppressP = false,
+  } = opts;
+
+  if (sineWaveQRS) {
+    // Severe hyperkalaemia: QRS and T merge into a sine wave at ~rate
+    return polarity * (Math.sin(phase * Math.PI * 2) * 0.55 * rAmp);
+  }
+
   let val = 0;
   const pS = 0.06 + prDelay * 0.08;
   const pE = 0.17 + prDelay * 0.04;
-  if (phase >= pS && phase <= pE) val = 0.15 * pAmp * Math.sin(((phase-pS)/(pE-pS))*Math.PI);
+
+  if (!suppressP && phase >= pS && phase <= pE) {
+    const pSign = pWaveInverted ? -1 : 1;
+    val = polarity * pSign * 0.15 * pAmp * Math.sin(((phase - pS) / (pE - pS)) * Math.PI);
+  }
+  if (atrialSpike && phase >= pS - 0.014 && phase < pS - 0.006) {
+    val += 0.55;
+  }
+  // PR-segment depression (pericarditis): pulls baseline down from P-end to QRS
+  if (prDepress > 0 && phase > pE && phase < (0.24 + prDelay * 0.1)) {
+    val -= prDepress;
+  }
+
   const qS = 0.24 + prDelay * 0.1;
   const qE = qS + 0.065 * qrsWidth;
-  if (phase >= qS && phase <= qE) {
-    const q = (phase-qS)/(qE-qS);
-    const qD = bigQ ? 0.25 : 0.1;
-    if (q<0.15) val = -qD*(q/0.15);
-    else if (q<0.4) val = -qD + (rAmp+qD)*((q-0.15)/0.25);
-    else if (q<0.65) { val = rAmp*(1-(q-0.4)/0.25); if (qrsNotch && q>0.48 && q<0.58) val += 0.15*rAmp; }
-    else { const sD = deepS?0.35:0.17; val = -sD*(1-(q-0.65)/0.35); }
+
+  // Delta wave (WPW): slurred upstroke that begins before normal Q
+  if (deltaWave > 0 && phase >= qS - 0.035 && phase < qS) {
+    const dp = (phase - (qS - 0.035)) / 0.035;
+    val += polarity * deltaWave * 0.45 * dp;
   }
-  // T wave — wider for Long QT
+  // Ventricular pacing spike — sharp narrow positive spike at QRS onset
+  if (pacingSpike && phase >= qS - 0.014 && phase < qS - 0.006) {
+    val += 0.7;
+  }
+
+  if (phase >= qS && phase <= qE) {
+    const q = (phase - qS) / (qE - qS);
+    const qD = bigQ ? 0.25 : 0.1;
+    let qv = 0;
+    if (q < 0.15) qv = -qD * (q / 0.15);
+    else if (q < 0.4) qv = -qD + (rAmp + qD) * ((q - 0.15) / 0.25);
+    else if (q < 0.65) { qv = rAmp * (1 - (q - 0.4) / 0.25); if (qrsNotch && q > 0.48 && q < 0.58) qv += 0.15 * rAmp; }
+    else { const sD = deepS ? 0.35 : 0.17; qv = -sD * (1 - (q - 0.65) / 0.35); }
+    val = polarity * qv;
+  }
+
+  // Osborn / J wave — small positive notch at end of QRS (lateral leads in hypothermia)
+  if (jWave > 0 && phase >= qE - 0.006 && phase <= qE + 0.028) {
+    const jp = (phase - (qE - 0.006)) / 0.034;
+    val += jWave * Math.sin(jp * Math.PI);
+  }
+
   const tGap = longQT ? 0.10 : 0.06;
-  const tWidth = longQT ? 0.28 : 0.17;
+  const tWidth = longQT ? 0.28 : (peakedT ? 0.13 : 0.17);
   const tS = qE + tGap;
   const tE = tS + tWidth;
+
+  // ST segment baseline (between J point and T onset)
+  if (phase >= qE && phase < tS) {
+    const stp = (phase - qE) / tGap;
+    let stBase = stShift;
+    if (stShape === "concave") stBase = stShift * (0.5 + 0.5 * stp);              // pericarditis concave up
+    else if (stShape === "convex") stBase = stShift * (1.0 - 0.15 * (1 - stp));   // tombstone
+    else if (stShape === "coved") stBase = stShift * (1.0 - 0.45 * stp);          // Brugada coved descent
+    else if (stShape === "scoop") stBase = stShift - 0.08 * Math.sin(stp * Math.PI); // dig effect
+    else if (stShape === "upslope" || deWinter) stBase = stShift * (1 - stp);
+    val += stBase;
+  }
+
+  // T wave
   if (phase >= tS && phase <= tE) {
-    const tp = (phase-tS)/(tE-tS);
-    // Long QT: bifid / broad notched T
+    const tp = (phase - tS) / (tE - tS);
+    let tVal;
     if (longQT) {
-      val = (tInvert?-1:1) * 0.24 * tAmp * (Math.sin(tp*Math.PI) + 0.3*Math.sin(tp*Math.PI*2));
+      tVal = polarity * (tInvert ? -1 : 1) * 0.24 * tAmp * (Math.sin(tp * Math.PI) + 0.3 * Math.sin(tp * Math.PI * 2));
+    } else if (biphasicT) {
+      // Wellens Type A: small initial positive then deep symmetric negative
+      tVal = polarity * (0.12 * tAmp * Math.sin(tp * Math.PI) - 0.45 * tAmp * Math.sin(tp * Math.PI * 2));
+    } else if (peakedT) {
+      // Hyperkalaemia: tall narrow symmetric T with pointed peak
+      const t2 = tp * 2 - 1; // -1..1
+      tVal = polarity * (tInvert ? -1 : 1) * 0.55 * tAmp * Math.max(0, 1 - t2 * t2);
     } else {
-      val = (tInvert?-1:1) * 0.24 * tAmp * Math.sin(tp*Math.PI);
+      tVal = polarity * (tInvert ? -1 : 1) * 0.24 * tAmp * Math.sin(tp * Math.PI);
+    }
+    // ST shift carries into T as a decaying baseline offset (J-point lift trails into T)
+    let stCarry;
+    if (stShape === "coved") stCarry = stShift * 0.4 * (1 - tp);
+    else if (stShape === "convex") stCarry = stShift * 0.6 * (1 - tp);
+    else stCarry = stShift * Math.max(0, 1 - tp * 1.4);
+    val = tVal + stCarry;
+  }
+
+  // U wave (after T) — hypokalaemia, bradycardia
+  if (uWave !== 0) {
+    const uS = tE + 0.02;
+    const uE = uS + 0.13;
+    if (phase >= uS && phase <= uE) {
+      val += uWave * Math.sin(((phase - uS) / (uE - uS)) * Math.PI);
     }
   }
+
   return val;
 }
 
@@ -267,19 +645,38 @@ function generateECGPoint(t, rhythm, beatPhase, leadMod) {
   const lm = leadMod || LEAD_MODS.II;
   const ax = lm.axis || 1;
 
-  // Apply lead modifiers to normalBeat
+  // pick(extraVal, leadVal, default) — prefer per-call override, fall back to per-lead mod
+  const pick = (a, b, d = 0) => (a !== undefined ? a : (b !== undefined ? b : d));
+
+  // Apply lead modifiers to normalBeat. ST/U/J/delta/spike overlays come from
+  // the rhythm-lead override (lm.stShift etc.) unless explicitly overridden.
   function leadNormal(phase, extra = {}) {
-    return ax * normalBeat(phase, {
-      pAmp: (extra.pAmp||1) * (lm.pAmp||1),
-      rAmp: (extra.rAmp||1) * (lm.rAmp||1),
+    return normalBeat(phase, {
+      polarity: ax,
+      pAmp: (extra.pAmp || 1) * (lm.pAmp || 1),
+      rAmp: (extra.rAmp || 1) * (lm.rAmp || 1),
       deepS: extra.deepS || lm.sD > 0.3,
-      tAmp: (extra.tAmp||1) * (lm.tAmp||1),
+      tAmp: (extra.tAmp || 1) * (lm.tAmp || 1),
       tInvert: extra.tInvert || lm.tInv || false,
       prDelay: extra.prDelay || 0,
       qrsWidth: extra.qrsWidth || 1,
-      qrsNotch: extra.qrsNotch || false,
-      bigQ: extra.bigQ || false,
+      qrsNotch: extra.qrsNotch || lm.qrsNotch || false,
+      bigQ: extra.bigQ || lm.bigQ || false,
       longQT: extra.longQT || false,
+      stShift: pick(extra.stShift, lm.stShift, 0),
+      stShape: extra.stShape || lm.stShape || "flat",
+      prDepress: pick(extra.prDepress, lm.prDepress, 0),
+      uWave: pick(extra.uWave, lm.uWave, 0),
+      jWave: pick(extra.jWave, lm.jWave, 0),
+      deltaWave: pick(extra.deltaWave, lm.deltaWave, 0),
+      pacingSpike: extra.pacingSpike || lm.pacingSpike || false,
+      atrialSpike: extra.atrialSpike || lm.atrialSpike || false,
+      biphasicT: extra.biphasicT || lm.biphasicT || false,
+      deWinter: extra.deWinter || lm.deWinter || false,
+      sineWaveQRS: extra.sineWaveQRS || false,
+      peakedT: extra.peakedT || lm.peakedT || false,
+      pWaveInverted: extra.pWaveInverted || false,
+      suppressP: extra.suppressP || false,
     });
   }
 
@@ -382,6 +779,74 @@ function generateECGPoint(t, rhythm, beatPhase, leadMod) {
     return leadNormal(ph);
   }
 
+  /* ── Ischemia / infarction ───────────────────────────
+     ST shifts and reciprocal changes live in RHYTHM_LEAD_OVERRIDES;
+     the engine just delegates to leadNormal which picks them up via lm. ── */
+  if (rhythm === "stemi_anterior" || rhythm === "stemi_inferior" ||
+      rhythm === "stemi_lateral"  || rhythm === "stemi_posterior" ||
+      rhythm === "stemi_rv"       || rhythm === "wellens" ||
+      rhythm === "dewinter"       || rhythm === "pericarditis" ||
+      rhythm === "brugada"        || rhythm === "hypothermia" ||
+      rhythm === "hypokalemia"    || rhythm === "digoxin_effect") {
+    return leadNormal(ph);
+  }
+
+  /* ── Hyperkalaemia: mild = tall peaked T globally ── */
+  if (rhythm === "hyperkalemia_mild") {
+    return leadNormal(ph, { peakedT: true, tAmp: 1.6, pAmp: 0.6 });
+  }
+  /* ── Hyperkalaemia: severe = sine wave (no P, fused QRS-T) ── */
+  if (rhythm === "hyperkalemia_severe") {
+    return leadNormal(ph, { sineWaveQRS: true, suppressP: true });
+  }
+
+  /* ── WPW: short PR + delta wave + slightly wide QRS ── */
+  if (rhythm === "wpw") {
+    return leadNormal(ph, { qrsWidth: 1.4, deltaWave: 0.6 });
+  }
+
+  /* ── Ventricular paced: pacing spike + wide LBBB-like QRS, no native P ── */
+  if (rhythm === "paced_ventricular") {
+    return leadNormal(ph, {
+      suppressP: true,
+      pacingSpike: true,
+      qrsWidth: 2.0,
+      qrsNotch: true,
+      rAmp: 0.85,
+      tInvert: true,
+      tAmp: 0.6,
+    });
+  }
+
+  /* ── Dual-chamber (DDD) paced: atrial spike + P + V spike + wide QRS ── */
+  if (rhythm === "paced_dual") {
+    return leadNormal(ph, {
+      atrialSpike: true,
+      pacingSpike: true,
+      qrsWidth: 1.9,
+      qrsNotch: true,
+      rAmp: 0.85,
+      tInvert: true,
+      tAmp: 0.6,
+    });
+  }
+
+  /* ── Junctional escape: narrow QRS, inverted/absent P ── */
+  if (rhythm === "junctional_escape") {
+    return leadNormal(ph, { suppressP: true });
+  }
+
+  /* ── AIVR: wide regular QRS, no P (like a slow VT morphology) ── */
+  if (rhythm === "aivr") {
+    if (ph < 0.55) {
+      const p = ph / 0.55;
+      return ax * (Math.sin(p * Math.PI * 1.6 - 0.15) * 0.45
+        + ((p > 0.15 && p < 0.45) ? Math.sin(((p - 0.15) / 0.30) * Math.PI) * 0.55 : 0))
+        * (lm.rAmp || 1);
+    }
+    return Math.sin(ph * 11) * 0.015;
+  }
+
   if (rhythm === "multifocal_pvc") {
     const bn = Math.floor(t*RHYTHMS[rhythm].bpm/60)%7;
     if (bn===2) {
@@ -449,6 +914,27 @@ function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II" }) {
     ctx.strokeStyle="rgba(34,197,94,0.11)";ctx.lineWidth=0.8;
     for(let x=0;x<w;x+=gs*5){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke()}
     for(let y=0;y<h;y+=gs*5){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+
+    // 1 mV / 200 ms calibration square wave (left edge, mid-baseline)
+    {
+      const bY = h*0.52;
+      const sY = h*0.34;        // matches waveform scaling — 1mV → sY pixels
+      const calX = 8;
+      const calW = gs*5;        // 5 small squares = 200ms at 25mm/s
+      ctx.strokeStyle = "rgba(148,163,184,0.55)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(calX, bY);
+      ctx.lineTo(calX + calW*0.2, bY);
+      ctx.lineTo(calX + calW*0.2, bY - sY);
+      ctx.lineTo(calX + calW*0.8, bY - sY);
+      ctx.lineTo(calX + calW*0.8, bY);
+      ctx.lineTo(calX + calW, bY);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(148,163,184,0.55)";
+      ctx.font = "9px 'JetBrains Mono', monospace";
+      ctx.fillText("1mV", calX + calW + 4, bY - sY + 8);
+    }
 
     const data=dataRef.current;
     if(data.length>1){
@@ -599,7 +1085,7 @@ export default function ECGSimulatorGuide() {
           </div>
           <div>
             <div style={{fontSize:15,fontWeight:700,letterSpacing:".06em",background:"linear-gradient(90deg,#34d399,#22d3ee)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>ECG SIMULATOR</div>
-            <div style={{fontSize:10,color:"#475569",letterSpacing:".18em"}}>COMPREHENSIVE RHYTHM GUIDE · 20 RHYTHMS</div>
+            <div style={{fontSize:10,color:"#475569",letterSpacing:".18em"}}>COMPREHENSIVE RHYTHM GUIDE · 39 RHYTHMS</div>
           </div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
