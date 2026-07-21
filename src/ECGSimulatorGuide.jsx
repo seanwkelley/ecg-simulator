@@ -23,21 +23,36 @@ const LEAD_MODS = {
 };
 const LEAD_NAMES = ["I","II","III","aVR","aVL","aVF","V1","V2","V3","V4","V5","V6"];
 
-// Anatomical territory each lead "looks at" — drives the 12-lead grid colour coding.
+// Anatomical territory each lead "looks at" — drives the 12-lead grid colour coding,
+// the lead-view diagrams, and the culprit-artery mapping.
+//   zone     — myocardial wall the lead faces
+//   angle    — frontal-plane axis in degrees (limb leads only; null for precordial)
+//   artery   — usual culprit vessel when this territory infarcts
+//   place    — electrode position (precordial) or derivation (limb)
 const LEAD_TERRITORY = {
-  I:   { zone:"Lateral",  color:"#f5a623" },
-  II:  { zone:"Inferior", color:"#f2712c" },
-  III: { zone:"Inferior", color:"#f2712c" },
-  aVR: { zone:"",         color:"#94a3b8" },
-  aVL: { zone:"Lateral",  color:"#f5a623" },
-  aVF: { zone:"Inferior", color:"#f2712c" },
-  V1:  { zone:"Septal",   color:"#8cc63e" },
-  V2:  { zone:"Septal",   color:"#8cc63e" },
-  V3:  { zone:"Anterior", color:"#0077b6" },
-  V4:  { zone:"Anterior", color:"#0077b6" },
-  V5:  { zone:"Lateral",  color:"#f5a623" },
-  V6:  { zone:"Lateral",  color:"#f5a623" },
+  I:   { zone:"Lateral",  color:"#f5a623", angle:0,    artery:"LCx", arteryAlt:"D1",  place:"LA − RA (frontal plane)" },
+  II:  { zone:"Inferior", color:"#f2712c", angle:60,   artery:"RCA", arteryAlt:"LCx", place:"LL − RA (frontal plane)" },
+  III: { zone:"Inferior", color:"#f2712c", angle:120,  artery:"RCA", arteryAlt:"LCx", place:"LL − LA (frontal plane)" },
+  aVR: { zone:"",         color:"#94a3b8", angle:-150, artery:"LMCA",arteryAlt:null,  place:"RA vs. (LA+LL)/2" },
+  aVL: { zone:"Lateral",  color:"#f5a623", angle:-30,  artery:"LCx", arteryAlt:"D1",  place:"LA vs. (RA+LL)/2" },
+  aVF: { zone:"Inferior", color:"#f2712c", angle:90,   artery:"RCA", arteryAlt:"LCx", place:"LL vs. (RA+LA)/2" },
+  V1:  { zone:"Septal",   color:"#8cc63e", angle:null, artery:"LAD", arteryAlt:null,  place:"4th ICS, right sternal border" },
+  V2:  { zone:"Septal",   color:"#8cc63e", angle:null, artery:"LAD", arteryAlt:null,  place:"4th ICS, left sternal border" },
+  V3:  { zone:"Anterior", color:"#0077b6", angle:null, artery:"LAD", arteryAlt:null,  place:"midway between V2 and V4" },
+  V4:  { zone:"Anterior", color:"#0077b6", angle:null, artery:"LAD", arteryAlt:null,  place:"5th ICS, midclavicular line" },
+  V5:  { zone:"Lateral",  color:"#f5a623", angle:null, artery:"LCx", arteryAlt:"D1",  place:"level with V4, anterior axillary line" },
+  V6:  { zone:"Lateral",  color:"#f5a623", angle:null, artery:"LCx", arteryAlt:null,  place:"level with V5, midaxillary line" },
 };
+
+const ARTERIES = {
+  LAD:  { name:"Left Anterior Descending", color:"#e11d48", supplies:"Anterior wall, anterior 2/3 of septum, apex" },
+  LCx:  { name:"Left Circumflex",          color:"#a855f7", supplies:"Lateral and posterolateral LV wall" },
+  RCA:  { name:"Right Coronary Artery",    color:"#0ea5e9", supplies:"Inferior wall, RV, SA/AV nodes (most people)" },
+  D1:   { name:"First Diagonal (of LAD)",  color:"#f43f5e", supplies:"High lateral wall" },
+  LMCA: { name:"Left Main",                color:"#dc2626", supplies:"LAD + LCx — aVR ST elevation suggests left main or triple-vessel disease" },
+};
+
+const ZONE_ORDER = ["Septal","Anterior","Lateral","Inferior"];
 // Standard 12-lead print layout: 4 columns × 3 rows, read down each column.
 const LEAD_GRID = [
   ["I","aVR","V1","V4"],
@@ -889,13 +904,16 @@ function generateECGPoint(t, rhythm, beatPhase, leadMod) {
 
 /* ══════════════════════ CANVAS ══════════════════════ */
 
-function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II" }) {
+function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II", onBeat }) {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
   const dataRef = useRef([]);
   const timeRef = useRef(0);
   const lastFrameRef = useRef(0);
   const beatAccRef = useRef(0);
+  // Kept in a ref so changing the handler doesn't tear down the animation loop.
+  const onBeatRef = useRef(onBeat);
+  useEffect(()=>{ onBeatRef.current = onBeat; },[onBeat]);
 
   // Compute lead modifier with rhythm-specific overrides
   const leadMod = useMemo(() => {
@@ -921,9 +939,19 @@ function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II" }) {
       const n = Math.max(1, Math.round(pps*dt));
       for (let i=0;i<n;i++) {
         timeRef.current += 1/pps;
+        const prev = beatAccRef.current;
         beatAccRef.current += (1/pps)/(60/bpm);
-        if (beatAccRef.current>=1) beatAccRef.current-=1;
-        dataRef.current.push(generateECGPoint(timeRef.current, rhythm, beatAccRef.current, leadMod));
+        const wrapped = beatAccRef.current>=1;
+        if (wrapped) beatAccRef.current-=1;
+        const cur = beatAccRef.current;
+        // Fire beat events as the beat phase sweeps past the R wave (~0.27) and
+        // the end of the T wave (~0.62). `wrapped` handles the 1→0 rollover.
+        if (onBeatRef.current && bpm>0) {
+          const crossed = p => wrapped ? (prev<p || cur>=p) : (prev<p && cur>=p);
+          if (crossed(0.27)) onBeatRef.current("s1");
+          if (crossed(0.62)) onBeatRef.current("s2");
+        }
+        dataRef.current.push(generateECGPoint(timeRef.current, rhythm, cur, leadMod));
       }
       if (dataRef.current.length > w+20) dataRef.current = dataRef.current.slice(-(Math.floor(w)+20));
     }
@@ -1059,6 +1087,228 @@ function ShockBadge({ shockable }) {
   );
 }
 
+/* ─── Audio ────────────────────────────────────────────────────────────────
+   Web Audio synth. Two modes:
+     beep   — monitor tone on every R wave
+     heart  — synthesised S1 ("lub") at QRS, S2 ("dub") after the T wave
+   The AudioContext is created lazily on the user's first click, because
+   browsers block audio started without a gesture.                          */
+function createSoundEngine() {
+  let ctx = null;
+  const ensure = () => {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === "suspended") ctx.resume();
+    return ctx;
+  };
+  // Short electronic monitor blip.
+  const beep = () => {
+    const c = ensure(), t = c.currentTime;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(880, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.2, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+    o.connect(g).connect(c.destination);
+    o.start(t); o.stop(t + 0.09);
+  };
+  // Valve sound: low sine with a downward pitch sweep through a lowpass —
+  // approximates the dull thud of valve closure.
+  const thud = (freq, dur, vol) => {
+    const c = ensure(), t = c.currentTime;
+    const o = c.createOscillator(), g = c.createGain(), f = c.createBiquadFilter();
+    f.type = "lowpass"; f.frequency.setValueAtTime(180, t);
+    o.type = "sine";
+    o.frequency.setValueAtTime(freq, t);
+    o.frequency.exponentialRampToValueAtTime(freq * 0.55, t + dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f); f.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  };
+  return {
+    beep,
+    s1: () => thud(58, 0.13, 0.5),   // louder, longer — mitral/tricuspid closure
+    s2: () => thud(78, 0.09, 0.3),   // sharper, quieter — aortic/pulmonic closure
+    resume: () => ensure(),
+  };
+}
+
+/* ─── Lead-view diagrams ───────────────────────────────────────────────── */
+
+// Annulus sector path, used for the LV short-axis wall segments.
+function sector(cx, cy, rOuter, rInner, a0, a1) {
+  const rad = d => (d * Math.PI) / 180;
+  const p = (r, a) => [cx + r * Math.cos(rad(a)), cy + r * Math.sin(rad(a))];
+  const [x0, y0] = p(rOuter, a0), [x1, y1] = p(rOuter, a1);
+  const [x2, y2] = p(rInner, a1), [x3, y3] = p(rInner, a0);
+  const large = Math.abs(a1 - a0) > 180 ? 1 : 0;
+  return `M${x0},${y0} A${rOuter},${rOuter} 0 ${large} 1 ${x1},${y1} L${x2},${y2} A${rInner},${rInner} 0 ${large} 0 ${x3},${y3} Z`;
+}
+
+// LV short-axis view: which wall does this lead face?
+function HeartWallDiagram({ lead }) {
+  const active = LEAD_TERRITORY[lead].zone;
+  const walls = [
+    { zone:"Anterior", a0:-135, a1:-45,  lx:100, ly:42  },
+    { zone:"Lateral",  a0:-45,  a1:45,   lx:158, ly:104 },
+    { zone:"Inferior", a0:45,   a1:135,  lx:100, ly:170 },
+    { zone:"Septal",   a0:135,  a1:225,  lx:56,  ly:104 },
+  ];
+  return (
+    <svg viewBox="0 0 200 200" style={{width:"100%",maxWidth:230,height:"auto",display:"block",margin:"0 auto"}}>
+      {walls.map(w=>{
+        const on = w.zone===active;
+        const col = Object.values(LEAD_TERRITORY).find(t=>t.zone===w.zone).color;
+        return (
+          <g key={w.zone}>
+            <path d={sector(100,104,66,36,w.a0,w.a1)}
+              fill={on?col:`${col}22`} stroke={on?col:`${col}33`} strokeWidth={on?2:1}/>
+            <text x={w.lx} y={w.ly} textAnchor="middle" fontSize="10"
+              fill={on?"#fff":"#64748b"} fontWeight={on?700:500}>{w.zone}</text>
+          </g>
+        );
+      })}
+      {/* RV crescent, sitting against the septum */}
+      <path d="M42,66 A62,62 0 0 0 42,142 A86,86 0 0 1 42,66 Z" fill="rgba(148,163,184,0.13)" stroke="rgba(148,163,184,0.3)" strokeWidth="1"/>
+      <text x="30" y="108" textAnchor="middle" fontSize="8" fill="#64748b">RV</text>
+      <text x="100" y="108" textAnchor="middle" fontSize="11" fill="#475569" fontWeight="700">LV</text>
+      <text x="100" y="194" textAnchor="middle" fontSize="8" fill="#475569">LV short axis</text>
+    </svg>
+  );
+}
+
+// Chest wall: where does the electrode physically go?
+function TorsoDiagram({ lead }) {
+  const dots = [
+    { id:"V1", x:88,  y:98  }, { id:"V2", x:112, y:98  },
+    { id:"V3", x:121, y:109 }, { id:"V4", x:130, y:120 },
+    { id:"V5", x:147, y:120 }, { id:"V6", x:162, y:120 },
+  ];
+  const isLimb = LEAD_TERRITORY[lead].angle !== null;
+  return (
+    <svg viewBox="0 0 200 200" style={{width:"100%",maxWidth:230,height:"auto",display:"block",margin:"0 auto"}}>
+      {/* torso outline */}
+      <path d="M60,26 Q100,16 140,26 L152,60 Q158,120 148,178 L52,178 Q42,120 48,60 Z"
+        fill="rgba(148,163,184,0.05)" stroke="rgba(148,163,184,0.25)" strokeWidth="1.4"/>
+      {/* sternum + ribs */}
+      <line x1="100" y1="40" x2="100" y2="132" stroke="rgba(148,163,184,0.3)" strokeWidth="2.5"/>
+      {[58,74,90,106,122].map((y,i)=>(
+        <g key={i}>
+          <path d={`M98,${y} Q72,${y+5} 54,${y+20}`} fill="none" stroke="rgba(148,163,184,0.18)" strokeWidth="1.2"/>
+          <path d={`M102,${y} Q128,${y+5} 146,${y+20}`} fill="none" stroke="rgba(148,163,184,0.18)" strokeWidth="1.2"/>
+        </g>
+      ))}
+      {dots.map(d=>{
+        const on = d.id===lead;
+        const col = LEAD_TERRITORY[d.id].color;
+        return (
+          <g key={d.id}>
+            {on && <circle cx={d.x} cy={d.y} r="11" fill={`${col}33`}/>}
+            <circle cx={d.x} cy={d.y} r={on?6:4.5} fill={col} stroke={on?"#fff":"none"} strokeWidth="1.5"/>
+            <text x={d.x} y={d.y-11} textAnchor="middle" fontSize="8"
+              fill={on?"#fff":"#64748b"} fontWeight={on?700:500}>{d.id}</text>
+          </g>
+        );
+      })}
+      <text x="100" y="194" textAnchor="middle" fontSize="8" fill="#475569">
+        {isLimb ? "limb lead — no chest electrode" : "anterior chest, patient facing you"}
+      </text>
+    </svg>
+  );
+}
+
+// Hexaxial reference: the frontal-plane angle each limb lead views from.
+function HexaxialDiagram({ lead }) {
+  const info = LEAD_TERRITORY[lead];
+  const limb = ["I","II","III","aVR","aVL","aVF"];
+  const rad = d => (d * Math.PI) / 180;
+  return (
+    <svg viewBox="0 0 200 200" style={{width:"100%",maxWidth:230,height:"auto",display:"block",margin:"0 auto"}}>
+      <circle cx="100" cy="100" r="60" fill="none" stroke="rgba(148,163,184,0.15)" strokeWidth="1"/>
+      <circle cx="100" cy="100" r="3" fill="#475569"/>
+      {limb.map(l=>{
+        const a = LEAD_TERRITORY[l].angle;
+        const on = l===lead;
+        const col = LEAD_TERRITORY[l].color;
+        const x = 100 + 60*Math.cos(rad(a)), y = 100 + 60*Math.sin(rad(a));
+        const lx = 100 + 75*Math.cos(rad(a)), ly = 100 + 75*Math.sin(rad(a));
+        return (
+          <g key={l}>
+            <line x1={100 - 60*Math.cos(rad(a))} y1={100 - 60*Math.sin(rad(a))} x2={x} y2={y}
+              stroke={on?col:"rgba(148,163,184,0.18)"} strokeWidth={on?2.5:1}/>
+            {on && <circle cx={x} cy={y} r="5" fill={col}/>}
+            <text x={lx} y={ly+3} textAnchor="middle" fontSize={on?11:9}
+              fill={on?col:"#64748b"} fontWeight={on?700:500}>{l}</text>
+          </g>
+        );
+      })}
+      {info.angle!==null
+        ? <text x="100" y="194" textAnchor="middle" fontSize="9" fill={info.color} fontWeight="700">{lead} = {info.angle>0?"+":""}{info.angle}°</text>
+        : <text x="100" y="194" textAnchor="middle" fontSize="8" fill="#475569">{lead} is precordial — horizontal plane</text>}
+    </svg>
+  );
+}
+
+function LeadViewPanel({ lead, isMobile }) {
+  const info = LEAD_TERRITORY[lead];
+  const art = ARTERIES[info.artery];
+  const alt = info.arteryAlt ? ARTERIES[info.arteryAlt] : null;
+  const partners = LEAD_NAMES.filter(l=>l!==lead && LEAD_TERRITORY[l].zone===info.zone && info.zone);
+  const card = { background:"rgba(15,23,42,0.4)", border:"1px solid rgba(100,116,139,0.1)", borderRadius:8, padding:"10px 10px 6px" };
+  return (
+    <div style={{animation:"fade-up .3s ease"}}>
+      {/* Summary line */}
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:10,padding:"8px 12px",borderRadius:8,background:`${info.color}0d`,border:`1px solid ${info.color}30`}}>
+        <span style={{fontSize:18,fontWeight:800,color:info.color}}>{lead}</span>
+        <span style={{fontSize:12,color:"#94a3b8"}}>
+          {info.zone ? <>views the <b style={{color:info.color}}>{info.zone.toLowerCase()}</b> wall</> : <>no single wall — faces the cavity from the right shoulder</>}
+        </span>
+        <div style={{flex:1}}/>
+        <span style={{fontSize:11,padding:"3px 9px",borderRadius:10,background:`${art.color}18`,color:art.color,border:`1px solid ${art.color}35`,fontWeight:700}}>{info.artery}</span>
+      </div>
+
+      {/* Three diagrams */}
+      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:8,marginBottom:10}}>
+        <div style={card}>
+          <div style={{fontSize:9,color:"#475569",letterSpacing:".18em",marginBottom:4}}>WHAT IT SEES</div>
+          <HeartWallDiagram lead={lead}/>
+        </div>
+        <div style={card}>
+          <div style={{fontSize:9,color:"#475569",letterSpacing:".18em",marginBottom:4}}>WHERE IT GOES</div>
+          <TorsoDiagram lead={lead}/>
+        </div>
+        <div style={card}>
+          <div style={{fontSize:9,color:"#475569",letterSpacing:".18em",marginBottom:4}}>FRONTAL-PLANE AXIS</div>
+          <HexaxialDiagram lead={lead}/>
+        </div>
+      </div>
+
+      {/* Coronary supply */}
+      <div style={{padding:"12px 14px",borderRadius:8,background:"rgba(15,23,42,0.4)",border:"1px solid rgba(100,116,139,0.08)",marginBottom:8}}>
+        <div style={{fontSize:10,color:"#475569",letterSpacing:".2em",marginBottom:7}}>CULPRIT ARTERY</div>
+        <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:5}}>
+          <span style={{fontSize:14,fontWeight:800,color:art.color}}>{info.artery}</span>
+          <span style={{fontSize:13,color:"#cbd5e1"}}>{art.name}</span>
+        </div>
+        <p style={{fontSize:12,color:"#94a3b8",lineHeight:1.7,margin:"0 0 8px"}}>{art.supplies}</p>
+        {alt && (
+          <p style={{fontSize:11,color:"#64748b",lineHeight:1.6,margin:"0 0 8px"}}>
+            Also consider <b style={{color:alt.color}}>{info.arteryAlt}</b> ({alt.name}) — {info.zone==="Inferior"
+              ? "in the ~10–15% of people with a left-dominant circulation, the inferior wall is supplied by the LCx rather than the RCA."
+              : "high lateral changes in I/aVL are often a diagonal branch rather than the circumflex proper."}
+          </p>
+        )}
+        <div style={{fontSize:11,color:"#64748b",lineHeight:1.7}}>
+          <div><b style={{color:"#94a3b8"}}>Electrode:</b> {info.place}</div>
+          {partners.length>0 && <div style={{marginTop:3}}><b style={{color:"#94a3b8"}}>Contiguous with:</b> {partners.join(", ")} — ST changes in two or more of these are needed to call a STEMI.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ECGSimulatorGuide() {
   const [rhythm, setRhythm] = useState("normal_sinus");
   const [isRunning, setIsRunning] = useState(true);
@@ -1070,8 +1320,24 @@ export default function ECGSimulatorGuide() {
   const [tab, setTab] = useState("clinical");
   const [viewMode, setViewMode] = useState("single"); // "single" | "twelve"
   const [selectedLead, setSelectedLead] = useState("II");
+  const [soundOn, setSoundOn] = useState(false);
+  const [soundMode, setSoundMode] = useState("beep"); // "beep" | "heart"
 
   useEffect(()=>{const c=()=>setIsMobile(window.innerWidth<=840);c();window.addEventListener("resize",c);return()=>window.removeEventListener("resize",c)},[]);
+
+  const engineRef = useRef(null);
+  const handleBeat = useCallback((kind)=>{
+    if (!soundOn) return;
+    const e = engineRef.current || (engineRef.current = createSoundEngine());
+    if (soundMode==="beep") { if (kind==="s1") e.beep(); }   // monitor blips on R only
+    else if (kind==="s1") e.s1(); else e.s2();
+  },[soundOn,soundMode]);
+
+  const toggleSound = () => {
+    // First click doubles as the user gesture that unlocks the AudioContext.
+    if (!soundOn) (engineRef.current || (engineRef.current = createSoundEngine())).resume();
+    setSoundOn(v=>!v);
+  };
 
   const current = RHYTHMS[rhythm];
   const filtered = useMemo(()=>Object.entries(RHYTHMS).filter(([,v])=>category==="All"||v.category===category),[category]);
@@ -1170,6 +1436,12 @@ export default function ECGSimulatorGuide() {
               <button className={`ctrl-btn ${viewMode==="twelve"?"on":""}`} onClick={()=>setViewMode(v=>v==="single"?"twelve":"single")}>{viewMode==="twelve"?"Lead II":"12-Lead"}</button>
               <button className={`ctrl-btn ${isRunning?"on":""}`} onClick={()=>setIsRunning(!isRunning)}>{isRunning?"⏸":"▶"}</button>
               <button className="ctrl-btn" onClick={()=>setSpeed(s=>s===0.5?1:s===1?1.5:s===1.5?2:0.5)}>×{speed}</button>
+              <button className={`ctrl-btn ${soundOn?"on":""}`} onClick={toggleSound} title={soundOn?"Mute":"Enable sound"}>{soundOn?"🔊":"🔇"}</button>
+              {soundOn && (
+                <button className="ctrl-btn" onClick={()=>setSoundMode(m=>m==="beep"?"heart":"beep")} title="Switch between monitor beep and heart sounds">
+                  {soundMode==="beep"?"beep":"lub-dub"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -1180,7 +1452,7 @@ export default function ECGSimulatorGuide() {
                 {LEAD_NAMES.map(l=><button key={l} className={`lead-btn ${selectedLead===l?"active":""}`} onClick={()=>setSelectedLead(l)}>{l}</button>)}
               </div>
               <div style={{borderRadius:8,overflow:"hidden",marginBottom:8,border:"1px solid rgba(52,211,153,0.1)",position:"relative",boxShadow:"0 0 30px rgba(52,211,153,0.03)"}}>
-                <ECGCanvas rhythm={rhythm} isRunning={isRunning} speed={speed} height={isMobile?180:220} leadName={selectedLead}/>
+                <ECGCanvas rhythm={rhythm} isRunning={isRunning} speed={speed} height={isMobile?180:220} leadName={selectedLead} onBeat={handleBeat}/>
                 <div style={{position:"absolute",top:7,left:10,fontSize:13,color:"#34d399",fontWeight:600,opacity:.6,letterSpacing:".1em"}}>{selectedLead}</div>
                 <div style={{position:"absolute",top:7,right:10,fontSize:10,color:"#475569"}}>25 mm/s · 10 mm/mV</div>
                 <div style={{position:"absolute",bottom:7,left:10,fontSize:10,color:"#475569"}}>{current.abbr}</div>
@@ -1224,7 +1496,19 @@ export default function ECGSimulatorGuide() {
           <div style={{display:"flex",gap:4,marginBottom:8}}>
             <button className={`tab-btn ${tab==="clinical"?"active":""}`} onClick={()=>setTab("clinical")}>Clinical Info</button>
             <button className={`tab-btn ${tab==="waves"?"active":""}`} onClick={()=>setTab("waves")}>Waveform Guide</button>
+            <button className={`tab-btn ${tab==="lead"?"active":""}`} onClick={()=>setTab("lead")}>Lead View</button>
           </div>
+
+          {tab==="lead" && (
+            <div key={selectedLead}>
+              {viewMode==="twelve" && (
+                <div style={{display:"flex",gap:3,marginBottom:8,flexWrap:"wrap"}}>
+                  {LEAD_NAMES.map(l=><button key={l} className={`lead-btn ${selectedLead===l?"active":""}`} onClick={()=>setSelectedLead(l)}>{l}</button>)}
+                </div>
+              )}
+              <LeadViewPanel lead={selectedLead} isMobile={isMobile}/>
+            </div>
+          )}
 
           {tab==="clinical" && (
             <div key={rhythm} style={{padding:"12px 14px",borderRadius:8,marginBottom:10,background:"rgba(15,23,42,0.4)",border:"1px solid rgba(100,116,139,0.06)",animation:"fade-up .3s ease"}}>
