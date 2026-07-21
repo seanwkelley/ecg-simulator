@@ -23,6 +23,28 @@ const LEAD_MODS = {
 };
 const LEAD_NAMES = ["I","II","III","aVR","aVL","aVF","V1","V2","V3","V4","V5","V6"];
 
+// Anatomical territory each lead "looks at" — drives the 12-lead grid colour coding.
+const LEAD_TERRITORY = {
+  I:   { zone:"Lateral",  color:"#f5a623" },
+  II:  { zone:"Inferior", color:"#f2712c" },
+  III: { zone:"Inferior", color:"#f2712c" },
+  aVR: { zone:"",         color:"#94a3b8" },
+  aVL: { zone:"Lateral",  color:"#f5a623" },
+  aVF: { zone:"Inferior", color:"#f2712c" },
+  V1:  { zone:"Septal",   color:"#8cc63e" },
+  V2:  { zone:"Septal",   color:"#8cc63e" },
+  V3:  { zone:"Anterior", color:"#0077b6" },
+  V4:  { zone:"Anterior", color:"#0077b6" },
+  V5:  { zone:"Lateral",  color:"#f5a623" },
+  V6:  { zone:"Lateral",  color:"#f5a623" },
+};
+// Standard 12-lead print layout: 4 columns × 3 rows, read down each column.
+const LEAD_GRID = [
+  ["I","aVR","V1","V4"],
+  ["II","aVL","V2","V5"],
+  ["III","aVF","V3","V6"],
+];
+
 // Special 12-lead overrides per rhythm (which leads look different)
 const RHYTHM_LEAD_OVERRIDES = {
   lbbb: {
@@ -1169,13 +1191,32 @@ export default function ECGSimulatorGuide() {
 
           {/* 12-Lead Grid */}
           {viewMode==="twelve" && (
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4,marginBottom:8}} key={rhythm+"12"}>
-              {LEAD_NAMES.map(l=>(
-                <div key={l} style={{borderRadius:6,overflow:"hidden",border:"1px solid rgba(52,211,153,0.08)",position:"relative"}}>
-                  <MiniECGCanvas rhythm={rhythm} isRunning={isRunning} speed={speed} leadName={l} height={isMobile?55:70}/>
-                  <div style={{position:"absolute",top:3,left:5,fontSize:11,color:"#34d399",fontWeight:600,opacity:.7}}>{l}</div>
-                </div>
-              ))}
+            <div key={rhythm+"12"} style={{marginBottom:8}}>
+              {/* Territory key — standard 4×3 lead layout */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:2,marginBottom:6}}>
+                {LEAD_GRID.flat().map(l=>{
+                  const t=LEAD_TERRITORY[l];
+                  return (
+                    <div key={l} style={{background:t.zone?t.color:"#f1f5f9",borderRadius:3,padding:isMobile?"3px 2px":"5px 4px",textAlign:"center",lineHeight:1.25}}>
+                      <div style={{fontSize:isMobile?10:12,fontWeight:800,color:t.zone?"#fff":"#334155"}}>{l}</div>
+                      {t.zone&&<div style={{fontSize:isMobile?8:10,fontWeight:700,color:"#fff"}}>{t.zone}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Traces, same 4×3 arrangement */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
+                {LEAD_GRID.flat().map(l=>{
+                  const t=LEAD_TERRITORY[l];
+                  return (
+                    <div key={l} style={{borderRadius:6,overflow:"hidden",border:`1px solid ${t.color}33`,borderTop:`2px solid ${t.color}`,position:"relative"}}>
+                      <MiniECGCanvas rhythm={rhythm} isRunning={isRunning} speed={speed} leadName={l} height={isMobile?55:70}/>
+                      <div style={{position:"absolute",top:4,left:5,fontSize:11,color:t.color,fontWeight:700}}>{l}</div>
+                      {t.zone&&<div style={{position:"absolute",bottom:3,right:5,fontSize:8,color:t.color,opacity:.75,letterSpacing:".08em",textTransform:"uppercase"}}>{t.zone}</div>}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
