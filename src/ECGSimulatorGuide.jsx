@@ -30,12 +30,12 @@ const LEAD_NAMES = ["I","II","III","aVR","aVL","aVF","V1","V2","V3","V4","V5","V
 //   artery   — usual culprit vessel when this territory infarcts
 //   place    — electrode position (precordial) or derivation (limb)
 const LEAD_TERRITORY = {
-  I:   { zone:"Lateral",  color:"#f5a623", angle:0,    artery:"LCx", arteryAlt:"D1",  place:"LA − RA (frontal plane)" },
-  II:  { zone:"Inferior", color:"#f2712c", angle:60,   artery:"RCA", arteryAlt:"LCx", place:"LL − RA (frontal plane)" },
-  III: { zone:"Inferior", color:"#f2712c", angle:120,  artery:"RCA", arteryAlt:"LCx", place:"LL − LA (frontal plane)" },
-  aVR: { zone:"",         color:"#94a3b8", angle:-150, artery:"LMCA",arteryAlt:null,  place:"RA vs. (LA+LL)/2" },
-  aVL: { zone:"Lateral",  color:"#f5a623", angle:-30,  artery:"LCx", arteryAlt:"D1",  place:"LA vs. (RA+LL)/2" },
-  aVF: { zone:"Inferior", color:"#f2712c", angle:90,   artery:"RCA", arteryAlt:"LCx", place:"LL vs. (RA+LA)/2" },
+  I:   { zone:"Lateral",  color:"#f5a623", angle:0,    artery:"LCx", arteryAlt:"D1",  place:"LA (+) − RA (−)", pos:"LA", neg:"RA" },
+  II:  { zone:"Inferior", color:"#f2712c", angle:60,   artery:"RCA", arteryAlt:"LCx", place:"LL (+) − RA (−)", pos:"LL", neg:"RA" },
+  III: { zone:"Inferior", color:"#f2712c", angle:120,  artery:"RCA", arteryAlt:"LCx", place:"LL (+) − LA (−)", pos:"LL", neg:"LA" },
+  aVR: { zone:"",         color:"#94a3b8", angle:-150, artery:"LMCA",arteryAlt:null,  place:"RA (+) vs. mean of LA & LL", pos:"RA", neg:null },
+  aVL: { zone:"Lateral",  color:"#f5a623", angle:-30,  artery:"LCx", arteryAlt:"D1",  place:"LA (+) vs. mean of RA & LL", pos:"LA", neg:null },
+  aVF: { zone:"Inferior", color:"#f2712c", angle:90,   artery:"RCA", arteryAlt:"LCx", place:"LL (+) vs. mean of RA & LA", pos:"LL", neg:null },
   V1:  { zone:"Septal",   color:"#8cc63e", angle:null, artery:"LAD", arteryAlt:null,  place:"4th ICS, right sternal border" },
   V2:  { zone:"Septal",   color:"#8cc63e", angle:null, artery:"LAD", arteryAlt:null,  place:"4th ICS, left sternal border" },
   V3:  { zone:"Anterior", color:"#0077b6", angle:null, artery:"LAD", arteryAlt:null,  place:"midway between V2 and V4" },
@@ -1179,16 +1179,39 @@ function HeartWallDiagram({ lead }) {
   );
 }
 
-// Chest wall: where does the electrode physically go?
+// Where does the electrode physically go? Shows the six precordial positions
+// (LITFL landmarks) plus the four limb electrodes, highlighting whichever the
+// selected lead is actually derived from.
 function TorsoDiagram({ lead }) {
+  const info = LEAD_TERRITORY[lead];
+  const isLimb = info.angle !== null;
+  // Precordial dots with explicit label offsets — auto-placing them above each
+  // dot made V3's label collide with V2's electrode.
   const dots = [
-    { id:"V1", x:88,  y:98  }, { id:"V2", x:112, y:98  },
-    { id:"V3", x:121, y:109 }, { id:"V4", x:130, y:120 },
-    { id:"V5", x:147, y:120 }, { id:"V6", x:162, y:120 },
+    { id:"V1", x:86,  y:96,  lx:86,  ly:85  },
+    { id:"V2", x:112, y:96,  lx:112, ly:85  },
+    { id:"V3", x:121, y:108, lx:134, ly:103 },
+    { id:"V4", x:130, y:120, lx:128, ly:134 },
+    { id:"V5", x:148, y:120, lx:148, ly:134 },
+    { id:"V6", x:164, y:120, lx:166, ly:134 },
   ];
-  const isLimb = LEAD_TERRITORY[lead].angle !== null;
+  // Limb electrodes sit on the limbs proper (torso placement is the Mason-Likar
+  // monitoring variant, noted in the caption).
+  const limbs = [
+    { id:"RA", x:26,  y:52,  lx:26,  ly:40  },
+    { id:"LA", x:174, y:52,  lx:174, ly:40  },
+    { id:"RL", x:34,  y:176, lx:34,  ly:192 },
+    { id:"LL", x:166, y:176, lx:166, ly:192 },
+  ];
+  const byId = Object.fromEntries(limbs.map(l=>[l.id,l]));
+  const posEl = isLimb ? byId[info.pos] : null;
+  const negEl = isLimb && info.neg ? byId[info.neg] : null;
+  const col = info.color;
   return (
     <svg viewBox="0 0 200 200" style={{width:"100%",maxWidth:230,height:"auto",display:"block",margin:"0 auto"}}>
+      {/* limb stubs */}
+      <path d="M60,30 L30,50 M140,30 L170,50 M64,178 L38,176 M136,178 L162,176"
+        fill="none" stroke="rgba(148,163,184,0.2)" strokeWidth="1.2"/>
       {/* torso outline */}
       <path d="M60,26 Q100,16 140,26 L152,60 Q158,120 148,178 L52,178 Q42,120 48,60 Z"
         fill="rgba(148,163,184,0.05)" stroke="rgba(148,163,184,0.25)" strokeWidth="1.4"/>
@@ -1200,20 +1223,49 @@ function TorsoDiagram({ lead }) {
           <path d={`M102,${y} Q128,${y+5} 146,${y+20}`} fill="none" stroke="rgba(148,163,184,0.18)" strokeWidth="1.2"/>
         </g>
       ))}
-      {dots.map(d=>{
-        const on = d.id===lead;
-        const col = LEAD_TERRITORY[d.id].color;
-        return (
-          <g key={d.id}>
-            {on && <circle cx={d.x} cy={d.y} r="11" fill={`${col}33`}/>}
-            <circle cx={d.x} cy={d.y} r={on?6:4.5} fill={col} stroke={on?"#fff":"none"} strokeWidth="1.5"/>
-            <text x={d.x} y={d.y-11} textAnchor="middle" fontSize="8"
-              fill={on?"#fff":"#64748b"} fontWeight={on?700:500}>{d.id}</text>
-          </g>
-        );
-      })}
-      <text x="100" y="194" textAnchor="middle" fontSize="8" fill="#475569">
-        {isLimb ? "limb lead — no chest electrode" : "anterior chest, patient facing you"}
+      {/* lead vector between the two limb electrodes forming a bipolar lead */}
+      {posEl && negEl && (
+        <line x1={negEl.x} y1={negEl.y} x2={posEl.x} y2={posEl.y}
+          stroke={col} strokeWidth="1.6" strokeDasharray="4 3" opacity="0.75"/>
+      )}
+      {/* precordial electrodes — dimmed when a limb lead is selected */}
+      <g opacity={isLimb?0.28:1}>
+        {dots.map(d=>{
+          const on = d.id===lead;
+          const dc = LEAD_TERRITORY[d.id].color;
+          return (
+            <g key={d.id}>
+              {on && <circle cx={d.x} cy={d.y} r="11" fill={`${dc}33`}/>}
+              <circle cx={d.x} cy={d.y} r={on?6:4.5} fill={dc} stroke={on?"#fff":"none"} strokeWidth="1.5"/>
+              <text x={d.lx} y={d.ly} textAnchor="middle" fontSize="8"
+                fill={on?"#fff":"#64748b"} fontWeight={on?700:500}>{d.id}</text>
+            </g>
+          );
+        })}
+      </g>
+      {/* limb electrodes — dimmed when a precordial lead is selected */}
+      <g opacity={isLimb?1:0.28}>
+        {limbs.map(l=>{
+          const isPos = posEl && l.id===info.pos;
+          const isNeg = negEl && l.id===info.neg;
+          const on = isPos || isNeg;
+          return (
+            <g key={l.id}>
+              {on && <circle cx={l.x} cy={l.y} r="10" fill={`${col}33`}/>}
+              <circle cx={l.x} cy={l.y} r={on?5.5:4} fill={on?col:"#64748b"}
+                stroke={on?"#fff":"none"} strokeWidth="1.3"/>
+              {isPos && <text x={l.x} y={l.y+3.2} textAnchor="middle" fontSize="9" fill="#fff" fontWeight="800">+</text>}
+              {isNeg && <text x={l.x} y={l.y+3.2} textAnchor="middle" fontSize="10" fill="#fff" fontWeight="800">−</text>}
+              <text x={l.lx} y={l.ly} textAnchor="middle" fontSize="8"
+                fill={on?col:"#64748b"} fontWeight={on?700:500}>{l.id}</text>
+            </g>
+          );
+        })}
+      </g>
+      <text x="100" y="160" textAnchor="middle" fontSize="7.5" fill="#475569">
+        {isLimb
+          ? (info.neg ? "bipolar — measured between the two" : "augmented — vs. mean of other two")
+          : "anterior chest, patient facing you"}
       </text>
     </svg>
   );
@@ -1234,19 +1286,30 @@ function HexaxialDiagram({ lead }) {
         const col = LEAD_TERRITORY[l].color;
         const x = 100 + 60*Math.cos(rad(a)), y = 100 + 60*Math.sin(rad(a));
         const lx = 100 + 75*Math.cos(rad(a)), ly = 100 + 75*Math.sin(rad(a));
+        // Negative half dashed, positive half solid with a pole marker, so the
+        // highlighted lead reads as a direction rather than a bare diameter.
+        const nx = 100 - 60*Math.cos(rad(a)), ny = 100 - 60*Math.sin(rad(a));
         return (
           <g key={l}>
-            <line x1={100 - 60*Math.cos(rad(a))} y1={100 - 60*Math.sin(rad(a))} x2={x} y2={y}
+            <line x1={100} y1={100} x2={nx} y2={ny}
+              stroke={on?col:"rgba(148,163,184,0.18)"} strokeWidth={on?1.4:1}
+              strokeDasharray={on?"3 3":undefined} opacity={on?0.6:1}/>
+            <line x1={100} y1={100} x2={x} y2={y}
               stroke={on?col:"rgba(148,163,184,0.18)"} strokeWidth={on?2.5:1}/>
-            {on && <circle cx={x} cy={y} r="5" fill={col}/>}
+            {on && <>
+              <circle cx={x} cy={y} r="6" fill={col}/>
+              <text x={x} y={y+3.4} textAnchor="middle" fontSize="9" fill="#0b1220" fontWeight="800">+</text>
+              <text x={nx} y={ny+3.4} textAnchor="middle" fontSize="10" fill={col} fontWeight="800" opacity="0.7">−</text>
+            </>}
             <text x={lx} y={ly+3} textAnchor="middle" fontSize={on?11:9}
               fill={on?col:"#64748b"} fontWeight={on?700:500}>{l}</text>
           </g>
         );
       })}
+      {/* Caption sits top-left: the bottom of the circle is crowded by III, aVF and II. */}
       {info.angle!==null
-        ? <text x="100" y="194" textAnchor="middle" fontSize="9" fill={info.color} fontWeight="700">{lead} = {info.angle>0?"+":""}{info.angle}°</text>
-        : <text x="100" y="194" textAnchor="middle" fontSize="8" fill="#475569">{lead} is precordial — horizontal plane</text>}
+        ? <text x="6" y="14" fontSize="9" fill={info.color} fontWeight="700">{lead} = {info.angle>0?"+":""}{info.angle}°</text>
+        : <text x="6" y="14" fontSize="8" fill="#475569">{lead} is precordial — horizontal plane</text>}
     </svg>
   );
 }
