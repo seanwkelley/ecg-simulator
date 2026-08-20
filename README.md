@@ -6,14 +6,14 @@ Built as a single React component, zero runtime dependencies beyond React. Educa
 
 ## Features
 
-- **39 rhythms** across 9 categories:
+- **42 rhythms** across 9 categories:
   - **Normal / Brady / Tachy** — NSR, sinus brady, sinus tachy, junctional escape, SVT (AVNRT).
   - **Arrhythmia** — AFib, AFlutter, PE (S1Q3T3), unifocal/multifocal PVCs, WPW pre-excitation, AIVR.
   - **Conduction** — 1°/2° Type I (Wenckebach) / 2° Type II (Mobitz) / 3° AV block, LBBB, RBBB, Long QT, Brugada Type 1.
   - **Ischemia / OMI** — Anterior, inferior, lateral, posterior, and RV STEMI; Wellens (Type A biphasic); De Winter T waves; acute pericarditis.
   - **Metabolic** — hyperkalaemia (peaked-T early stage), hypokalaemia (U waves), hypothermia (Osborn / J waves), digoxin effect (scooped ST).
-  - **Paced** — RV-paced (LBBB-like + spike), dual-chamber DDD.
-  - **Emergency** — VTach, VFib, asystole, Torsades, complete heart block, hyperkalaemia sine-wave (pre-arrest).
+  - **Paced** — RV-paced (VVI, LBBB-like), atrial-paced (AAI, spike + *narrow* QRS), dual-chamber DDD, and biventricular CRT (LV lead via coronary sinus — dominant R in V1, q in I/aVL, narrower QRS than RV-only).
+  - **Emergency** — VTach, VFib, asystole, PEA, Torsades, complete heart block, hyperkalaemia sine-wave (pre-arrest).
 - **12-lead view** with per-lead morphology modifiers (P amplitude, R amplitude, S depth, T polarity, **ST shift**, **PR depression**, U/J/delta waves, pacing spikes).
 - **STEMI territory mapping** — every STEMI variant places ST elevation in the anatomically-correct leads with reciprocal ST depression in the opposing territory.
 - **Lead selector** in single-lead mode — switch between I, II, III, aVR, aVL, aVF, V1–V6.
@@ -26,6 +26,7 @@ Built as a single React component, zero runtime dependencies beyond React. Educa
   - **Monitor** — a 662 Hz QRS tone (the pitch a Philips IntelliVue emits at SpO2 100%) fired on each *detected* QRS, plus IEC 60601-1-8 alarm bursts (five pulses grouped 3 + 2 for red, three for yellow). Dropped beats are silent; VF, asystole and torsades produce **no tone at all** — only the alarm.
   - **Stethoscope** — S1 (M1 + T1), S2 (A2 + P2 with a respiration-driven split), S4, S3 and the pericardial friction rub. S1 intensity tracks the PR interval or preceding R-R, so AF, complete heart block and VT all get the variable S1 they have in life.
 - **Real R-R intervals** — AF is irregularly irregular, Wenckebach's R-R shortens through the group before the pause, PVCs carry a full compensatory pause, and sinus rhythm has respiratory sinus arrhythmia. Timing drives both the trace and the sound.
+- **Monitor-style pacing indicators** — a real pacing spike is 0.5–2 ms wide, narrower than one sample of the sweep, so it cannot be drawn from the waveform (it lands on 0 or 1 sample and flickers). Real monitors synthesise a marker instead, and so does this: the beat clock emits spike *times* and the canvas draws them, correctly placed for atrial vs ventricular leads.
 - **Speed control**, play/pause, category filter, mobile-friendly layout.
 
 ## Quick start
@@ -81,7 +82,7 @@ tab           — "clinical" | "waves"
 - Heart sounds are synthesised (filtered noise + swept sine), not sampled recordings. They carry the right *timing, intensity and splitting* — which is what the rhythms differ in — but not the timbre of a real stethoscope.
 - Alarm melodies follow the IEC 60601-1-8 pulse *structure* (count, grouping, fundamental range, harmonic content). The Annex F per-application melodies are not in any freely available source, so a single fundamental is used per priority rather than a manufacturer's exact cardiac melody.
 - Murmurs are not modelled — only the heart sounds, gallops and the pericardial rub. Valvular disease is a separate axis from rhythm.
-- Shockable classification applies to arrest rhythms only; PEA is a clinical diagnosis, not a waveform, so it's not represented as a separate rhythm.
+- Shockable classification applies to arrest rhythms only. PEA is included despite being a clinical diagnosis rather than a waveform, because the two audio modes can express it: the monitor tones normally and raises no alarm, while the stethoscope is silent. That gap is the teaching point, and it is the one arrest rhythm the screen cannot diagnose.
 
 ## Audio: sources for the medical model
 
@@ -101,6 +102,10 @@ tab           — "clinical" | "waves"
 | QRS tone pitch 662 Hz at SpO2 100% | Philips IntelliVue — f = 662 / 2^((100 − SpO2)/24) |
 | Alarm pulse structure, fundamental and harmonics | IEC 60601-1-8 |
 | No continuous flatline tone in real monitors | Asystole alarms as a repeating burst, not a monotone |
+| PEA: organised complexes, no pulse, no heart sounds | AHA/ACLS Asystole/PEA Algorithm |
+| BiV/CRT: dominant R in V1 (~65%), q in I and aVL | Ammann et al., *Indian Heart J* 2017 |
+| Pseudo-RBBB in 8–22% of ordinary RV pacing | *Innovations in CRM* 2014 — RBBB pattern during RV pacing |
+| AAI pacing gives a narrow, natively-conducted QRS | Bernstein et al., *PACE* 2002 (NBG code) |
 
 ## References
 

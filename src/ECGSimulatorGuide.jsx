@@ -211,6 +211,14 @@ const RHYTHM_LEAD_OVERRIDES = {
     V1: { rAmp: 0.2, sD: 0.8, tInv: false, tAmp: 0.6 },
     V6: { rAmp: 1.0, sD: 0.05, tInv: true, tAmp: 0.6 },
   },
+  // ── BiV / CRT: LV lead flips V1 positive and cuts a q into I and aVL ──
+  paced_biv: {
+    V1:  { rAmp: 1.0, sD: 0.1, tInv: true, tAmp: 0.6 },   // dominant R — the CRT signature
+    V2:  { rAmp: 0.8, sD: 0.2, tInv: true, tAmp: 0.6 },
+    I:   { rAmp: 0.25, sD: 0.5, tInv: true, tAmp: 0.5, bigQ: true },
+    aVL: { rAmp: 0.25, sD: 0.45, tInv: true, tAmp: 0.5, bigQ: true },
+    V6:  { rAmp: 0.7, sD: 0.25, tInv: true, tAmp: 0.6 },
+  },
 };
 
 const RHYTHMS = {
@@ -505,7 +513,7 @@ const RHYTHMS = {
     shockable: null,
     description: "RV apical pacing produces a sharp pacing spike followed by a wide QRS with an LBBB-like morphology (RV is depolarised first, LV follows late via cell-to-cell conduction). Underlying intrinsic rhythm may or may not be visible.",
     keyFeatures: ["Pacing spike before every QRS","Wide QRS, LBBB-like morphology","Appropriate ST-T discordance","Capture confirmed by QRS after each spike"],
-    clinicalNote: "Modified Sgarbossa (Smith) criteria are used to diagnose acute MI in paced rhythm. Failure to capture (spike without QRS), failure to sense (spikes in inappropriate places), or no spikes at all all suggest pacemaker malfunction.",
+    clinicalNote: "Modified Sgarbossa (Smith) criteria are used to diagnose acute MI in paced rhythm. Failure to capture (spike without QRS), failure to sense (spikes in inappropriate places), or no spikes at all all suggest pacemaker malfunction. The generator sits in a left or right pectoral pocket depending on venous access — usually left, right for left-handed patients or a blocked/occupied left subclavian. Pocket side is anatomical only and does NOT change the ECG; what changes the waveform is which CHAMBER the lead paces.",
     reference: "Sgarbossa et al., NEJM 1996; LITFL — Pacemaker Rhythms",
   },
   paced_dual: {
@@ -515,6 +523,30 @@ const RHYTHMS = {
     keyFeatures: ["Atrial spike before each P","Ventricular spike before each QRS","Wide LBBB-like QRS","AV delay preserved"],
     clinicalNote: "Indications: AV block with preserved sinus node function, sinus node dysfunction. Mode-switching prevents tracking of atrial arrhythmias. Pacemaker syndrome occurs with loss of AV synchrony in single-chamber pacing.",
     reference: "Bernstein et al., PACE 2002 (NBG code); LITFL — DDD pacing",
+  },
+  paced_atrial: {
+    name: "Atrial Paced (AAI)", abbr: "AAI", bpm: 70, category: "Paced", color: "#7dd3fc",
+    shockable: null,
+    description: "Single-chamber ATRIAL pacing. A spike precedes each P wave, then the impulse travels the patient's own AV node and His-Purkinje system — so the QRS is NARROW and looks entirely normal. The only abnormality on the strip is the spike itself.",
+    keyFeatures: ["Pacing spike before each P wave","NARROW QRS (< 120 ms)","Normal ST-T — no discordance","No ventricular spike"],
+    clinicalNote: "Used for sinus node dysfunction with intact AV conduction. Rare as a standalone mode now, because ~1–2%/year develop AV block and then have no ventricular backup — most centres implant DDD instead. Contrast with V-paced: the narrow QRS is what tells you the ventricle is being reached natively.",
+    reference: "Bernstein et al., PACE 2002 (NBG code); LITFL — Pacemaker Rhythms",
+  },
+  paced_biv: {
+    name: "Biventricular Paced (CRT)", abbr: "BiV/CRT", bpm: 72, category: "Paced", color: "#2563eb",
+    shockable: null,
+    description: "Cardiac resynchronisation therapy — a second lead paces the LEFT ventricle through a coronary sinus branch, alongside the RV lead. Fusing the two wavefronts gives a QRS that is NARROWER than RV pacing alone, with a dominant R wave in V1 and a q wave in I/aVL. This is the 'left-sided' pacing counterpart to conventional RV pacing.",
+    keyFeatures: ["Dominant R wave in V1 (~65% of CRT patients)","Q/q wave in leads I and aVL","Narrower QRS than RV-only pacing","Right or left superior axis"],
+    clinicalNote: "Indicated in heart failure with LVEF ≤ 35% and LBBB with QRS ≥ 150 ms. Loss of the dominant R in V1 suggests the LV lead has failed or dislodged — resynchronisation is lost and the patient reverts to RV-only pacing. Note ~8–22% of ordinary RV pacing also shows a pseudo-RBBB pattern, so V1 alone does not prove LV capture.",
+    reference: "Ammann et al., Indian Heart J 2017 — BiV paced ECG patterns",
+  },
+  pea: {
+    name: "Pulseless Electrical Activity", abbr: "PEA", bpm: 50, category: "Emergency", color: "#a16207",
+    shockable: false,
+    description: "Organised electrical activity on the monitor with NO palpable pulse and no effective cardiac output. The complexes are often slow and wide, but PEA can look near-normal — it is defined by the absence of a pulse, not by the waveform. The one arrest rhythm the screen will not diagnose for you.",
+    keyFeatures: ["Organised QRS complexes present","NO palpable pulse","Often slow and wide","Waveform alone cannot diagnose it"],
+    clinicalNote: "NON-SHOCKABLE. CPR + epinephrine, and hunt the cause — 5 H's and 5 T's. Check the patient, not the monitor: an organised-looking trace with no pulse is PEA. The monitor will keep beeping contentedly throughout, which is exactly the trap.",
+    reference: "AHA/ACLS Asystole/PEA Algorithm",
   },
   junctional_escape: {
     name: "Junctional Escape", abbr: "Junct", bpm: 45, category: "Bradycardia", color: "#94a3b8",
@@ -651,10 +683,21 @@ const RHYTHM_AUDIO = {
   digoxin_effect: { s4: 0.5, note: "Regular and unremarkable at therapeutic levels. Toxicity is what becomes audible — variable S1 as AV block and ectopy appear." },
   wpw: { qrsWidth: 1.4, s1: 1.3,
     note: "Regular with a LOUD S1 — the short PR means the AV valves are still fully open when the ventricle fires. Pre-excitation shortens the mechanical PR just as it shortens the electrical one." },
-  paced_ventricular: { qrsWidth: 2.0, split: -40, s4: 0,
+  // PEA: there IS organised electrical activity, so the monitor tones exactly as
+  // if nothing were wrong — but there is no output, so s1/s2 are zero and the
+  // stethoscope stays completely silent. And no alarm: a monitor reads ECG, not
+  // perfusion, so it cannot see PEA at all. The gap between the two modes is
+  // the entire lesson.
+  pea: { qrsWidth: 2.2, s1: 0, s2: 0, s4: 0, alarm: null,
+    note: "The cruellest one to hear. There IS organised electrical activity, so the monitor tones away steadily as though the patient were fine — and it raises NO alarm, because a monitor reads voltage, not perfusion. But there is no cardiac output, so the stethoscope is completely silent: no lub, no dub, nothing. Beeping monitor plus a silent chest IS pulseless electrical activity. The machine cannot tell you this; only your hands and your stethoscope can." },
+  paced_ventricular: { qrsWidth: 2.0, split: -40, s4: 0, spikes: [{ ph: 0.23, kind: "V" }],
     note: "Machine-perfect regularity — no respiratory variation at all, which is itself the giveaway. The pacing spike makes no sound. RV pacing activates the ventricles like an LBBB, so S2 splits paradoxically, and with no AV synchrony there is no S4." },
-  paced_dual: { qrsWidth: 1.9, split: -35, s4: 0.6,
+  paced_dual: { qrsWidth: 1.9, split: -35, s4: 0.6, spikes: [{ ph: 0.05, kind: "A" }, { ph: 0.23, kind: "V" }],
     note: "Machine-regular, but AV synchrony is restored — the atrial kick is timed, so an S4-like atrial sound returns ahead of S1. RV pacing still reverses the S2 split." },
+  paced_atrial: { qrsWidth: 1, s4: 0.5, spikes: [{ ph: 0.05, kind: "A" }],
+    note: "Sounds NORMAL — and that is the teaching point. The ventricle is reached through the patient's own conduction system, so activation is physiological: normal S1, a normally split S2 that widens on inspiration, and a paced atrial kick ahead of S1. Only the spike before each P betrays the pacemaker. Machine-regular, with no respiratory sinus arrhythmia." },
+  paced_biv: { qrsWidth: 1.5, split: 20, s4: 0.6, spikes: [{ ph: 0.23, kind: "V" }],
+    note: "Machine-regular like any paced rhythm, but resynchronisation NARROWS the QRS and pulls the ventricles back together — so the reversed split of RV-only pacing collapses toward a normal split. Recovering a normal S2 split is, audibly, what CRT is for." },
   junctional_escape: { s1: 1.15, s4: 0, alarm: "medium",
     note: "Slow, regular, and S1 is loud: retrograde atrial activation contracts the atria almost simultaneously with the ventricles, so the valves are still wide open. Cannon a-waves are visible in the neck on every beat. HR-low alarm." },
   aivr: { rPhase: 0.165, dissoc: true, s4: 0,
@@ -802,7 +845,12 @@ function makeBeatClock(rhythm) {
      A beat with no QRS produces none at all — that is the point. */
   function schedule(b) {
     b.ev = [];
-    if (!b.qrs) return b;
+    // Pacing spikes are ~0.5–2 ms wide — far narrower than one sample of the
+    // sweep, so they cannot be drawn from the waveform (they land on 0 or 1
+    // sample and flicker). Real monitors have the same problem and solve it the
+    // same way: emit the spike TIMES and draw a synthesised indicator.
+    b.spikes = (prof.spikes || []).map(s => ({ t: s.ph * b.ref, kind: s.kind }));
+    if (!b.qrs) { b.spikes = []; return b; }
     const r = b.rPhase * b.ref;                       // R wave / S1
     if (b.s4 > 0 && r - 0.065 > 0.002) b.ev.push([r - 0.065, "s4"]);
     b.ev.push([r, "s1"]);
@@ -871,9 +919,10 @@ function normalBeat(phase, opts = {}) {
     const pSign = pWaveInverted ? -1 : 1;
     val = polarity * pSign * 0.15 * pAmp * Math.sin(((phase - pS) / (pE - pS)) * Math.PI);
   }
-  if (atrialSpike && phase >= pS - 0.014 && phase < pS - 0.006) {
-    val += 0.55;
-  }
+  // Pacing spikes are no longer drawn from the waveform — at ~7 ms they were
+  // narrower than one sample of the sweep and flickered in and out. They are
+  // emitted as timed events by the beat clock and drawn as monitor-style
+  // pacing indicators instead. See makeBeatClock's schedule().
   // PR-segment depression (pericarditis): pulls baseline down from P-end to QRS
   if (prDepress > 0 && phase > pE && phase < (0.24 + prDelay * 0.1)) {
     val -= prDepress;
@@ -887,11 +936,6 @@ function normalBeat(phase, opts = {}) {
     const dp = (phase - (qS - 0.035)) / 0.035;
     val += polarity * deltaWave * 0.45 * dp;
   }
-  // Ventricular pacing spike — sharp narrow positive spike at QRS onset
-  if (pacingSpike && phase >= qS - 0.014 && phase < qS - 0.006) {
-    val += 0.7;
-  }
-
   if (phase >= qS && phase <= qE) {
     const q = (phase - qS) / (qE - qS);
     const qD = bigQ ? 0.25 : 0.1;
@@ -1153,6 +1197,36 @@ function generateECGPoint(t, rhythm, beatPhase, leadMod, beat) {
     });
   }
 
+  /* ── Atrial paced (AAI): spike before P, then the patient's OWN conduction
+        system carries the impulse — so the QRS is narrow and normal. ── */
+  if (rhythm === "paced_atrial") {
+    return leadNormal(ph, { atrialSpike: true });
+  }
+
+  /* ── BiV / CRT: fusing RV and LV wavefronts gives a QRS narrower than
+        RV-only pacing. Per-lead R/q pattern lives in RHYTHM_LEAD_OVERRIDES. ── */
+  if (rhythm === "paced_biv") {
+    return leadNormal(ph, {
+      suppressP: true,
+      pacingSpike: true,
+      qrsWidth: 1.5,
+      rAmp: 0.9,
+      tInvert: true,
+      tAmp: 0.6,
+    });
+  }
+
+  /* ── PEA: organised but sick-looking — wide, slow, low-amplitude, with a
+        feeble P and a flattened T. Looks like a rhythm; produces no pulse. ── */
+  if (rhythm === "pea") {
+    return leadNormal(ph, {
+      qrsWidth: 2.2,
+      rAmp: 0.55,
+      pAmp: 0.35,
+      tAmp: 0.35,
+    });
+  }
+
   /* ── Junctional escape: narrow QRS, inverted/absent P ── */
   if (rhythm === "junctional_escape") {
     return leadNormal(ph, { suppressP: true });
@@ -1192,6 +1266,9 @@ function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II", onBeat
   const canvasRef = useRef(null);
   const animRef = useRef(null);
   const dataRef = useRef([]);
+  // Parallel to dataRef: 0 = nothing, 1 = atrial spike, 2 = ventricular spike.
+  // Kept in lockstep with the sample array so it survives scroll-trimming.
+  const flagRef = useRef([]);
   const timeRef = useRef(0);
   const lastFrameRef = useRef(0);
   const clockRef = useRef(null);
@@ -1231,20 +1308,28 @@ function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II", onBeat
         let to = from + step;
         // Sound events sit at real times inside the beat, so a dropped QRS or a
         // compensatory pause is genuinely silent rather than beeping on schedule.
+        let spike = 0;
         if (onBeatRef.current) {
           for (const [when, kind] of beat.ev) if (when>from && when<=to) onBeatRef.current(kind, beat);
         }
+        for (const s of beat.spikes) if (s.t>from && s.t<=to) spike = s.kind==="A" ? 1 : 2;
         if (to >= beat.dur) {
           to -= beat.dur;
           beat = beatRef.current = clockRef.current.next();
           if (onBeatRef.current) {
             for (const [when, kind] of beat.ev) if (when<=to) onBeatRef.current(kind, beat);
           }
+          for (const s of beat.spikes) if (s.t<=to) spike = s.kind==="A" ? 1 : 2;
         }
         elapsedRef.current = to;
         dataRef.current.push(generateECGPoint(timeRef.current, rhythm, to/beat.ref, leadMod, beat));
+        flagRef.current.push(spike);
       }
-      if (dataRef.current.length > w+20) dataRef.current = dataRef.current.slice(-(Math.floor(w)+20));
+      if (dataRef.current.length > w+20) {
+        const keep = Math.floor(w)+20;
+        dataRef.current = dataRef.current.slice(-keep);
+        flagRef.current = flagRef.current.slice(-keep);
+      }
     }
 
     ctx.fillStyle = "#070c18"; ctx.fillRect(0,0,w,h);
@@ -1278,6 +1363,22 @@ function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II", onBeat
     }
 
     const data=dataRef.current;
+    // Pacing indicators, drawn UNDER the trace. A real pacing spike is too
+    // narrow for the ECG bandwidth, so monitors synthesise this marker rather
+    // than rendering it from the signal — same reason we do.
+    if(data.length>1){
+      const bY=h*0.52, sY=h*0.34, len=data.length, sx=w-len, flags=flagRef.current;
+      for(let i=0;i<len;i++){
+        const f=flags[i]; if(!f) continue;
+        const x=sx+i, top=bY-sY*(f===2?0.95:0.5);
+        ctx.save();
+        ctx.strokeStyle=f===2?"#e0f2fe":"#a5b4fc";
+        ctx.shadowColor=ctx.strokeStyle;ctx.shadowBlur=6;
+        ctx.lineWidth=1.4;
+        ctx.beginPath();ctx.moveTo(x,bY+5);ctx.lineTo(x,top);ctx.stroke();
+        ctx.restore();
+      }
+    }
     if(data.length>1){
       const bY=h*0.52, sY=h*0.34, rc=RHYTHMS[rhythm].color, len=data.length, sx=w-len;
       ctx.save();ctx.shadowColor=rc;ctx.shadowBlur=12;ctx.strokeStyle=rc;ctx.lineWidth=1.8;ctx.lineJoin="round";ctx.lineCap="round";ctx.globalAlpha=0.4;
@@ -1293,7 +1394,7 @@ function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II", onBeat
 
   useEffect(()=>{animRef.current=requestAnimationFrame(draw);return()=>{if(animRef.current)cancelAnimationFrame(animRef.current)}},[draw]);
   useEffect(()=>{
-    dataRef.current=[];timeRef.current=0;lastFrameRef.current=0;elapsedRef.current=0;
+    dataRef.current=[];flagRef.current=[];timeRef.current=0;lastFrameRef.current=0;elapsedRef.current=0;
     clockRef.current=makeBeatClock(rhythm);beatRef.current=clockRef.current.next();
   },[rhythm,leadName]);
 
@@ -1305,6 +1406,7 @@ function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70 }) {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
   const dataRef = useRef([]);
+  const flagRef = useRef([]);
   const timeRef = useRef(0);
   const lastFrameRef = useRef(0);
   const clockRef = useRef(null);
@@ -1336,12 +1438,21 @@ function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70 }) {
       for (let i=0;i<n;i++) {
         timeRef.current += step;
         let beat = beatRef.current;
-        let to = elapsedRef.current + step;
-        if (to >= beat.dur) { to -= beat.dur; beat = beatRef.current = clockRef.current.next(); }
+        const from = elapsedRef.current;
+        let to = from + step;
+        let spike = 0;
+        for (const s of beat.spikes) if (s.t>from && s.t<=to) spike = s.kind==="A" ? 1 : 2;
+        if (to >= beat.dur) { to -= beat.dur; beat = beatRef.current = clockRef.current.next();
+          for (const s of beat.spikes) if (s.t<=to) spike = s.kind==="A" ? 1 : 2; }
         elapsedRef.current = to;
         dataRef.current.push(generateECGPoint(timeRef.current, rhythm, to/beat.ref, leadMod, beat));
+        flagRef.current.push(spike);
       }
-      if (dataRef.current.length > w+10) dataRef.current = dataRef.current.slice(-(Math.floor(w)+10));
+      if (dataRef.current.length > w+10) {
+        const keep = Math.floor(w)+10;
+        dataRef.current = dataRef.current.slice(-keep);
+        flagRef.current = flagRef.current.slice(-keep);
+      }
     }
 
     ctx.fillStyle = "#070c18"; ctx.fillRect(0,0,w,h);
@@ -1352,6 +1463,15 @@ function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70 }) {
 
     const data=dataRef.current;
     if(data.length>1){
+      const bY=h*0.52, sY=h*0.34, len=data.length, sx=w-len, flags=flagRef.current;
+      for(let i=0;i<len;i++){
+        const f=flags[i]; if(!f) continue;
+        ctx.strokeStyle=f===2?"#e0f2fe":"#a5b4fc";ctx.lineWidth=1;ctx.globalAlpha=0.75;
+        ctx.beginPath();ctx.moveTo(sx+i,bY+3);ctx.lineTo(sx+i,bY-sY*(f===2?0.9:0.5));ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    }
+    if(data.length>1){
       const bY=h*0.52, sY=h*0.34, rc=RHYTHMS[rhythm].color, len=data.length, sx=w-len;
       ctx.strokeStyle=rc;ctx.lineWidth=1.2;ctx.lineJoin="round";ctx.lineCap="round";ctx.globalAlpha=0.8;
       ctx.beginPath();for(let i=0;i<len;i++){const x=sx+i,y=bY-data[i]*sY;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)}ctx.stroke();ctx.globalAlpha=1;
@@ -1361,7 +1481,7 @@ function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70 }) {
 
   useEffect(()=>{animRef.current=requestAnimationFrame(draw);return()=>{if(animRef.current)cancelAnimationFrame(animRef.current)}},[draw]);
   useEffect(()=>{
-    dataRef.current=[];timeRef.current=0;lastFrameRef.current=0;elapsedRef.current=0;
+    dataRef.current=[];flagRef.current=[];timeRef.current=0;lastFrameRef.current=0;elapsedRef.current=0;
     clockRef.current=makeBeatClock(rhythm);beatRef.current=clockRef.current.next();
   },[rhythm,leadName]);
 
@@ -1903,7 +2023,7 @@ export default function ECGSimulatorGuide() {
           </div>
           <div>
             <div style={{fontSize:15,fontWeight:700,letterSpacing:".06em",background:"linear-gradient(90deg,#34d399,#22d3ee)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>ECG SIMULATOR</div>
-            <div style={{fontSize:10,color:"#475569",letterSpacing:".18em"}}>COMPREHENSIVE RHYTHM GUIDE · 39 RHYTHMS</div>
+            <div style={{fontSize:10,color:"#475569",letterSpacing:".18em"}}>COMPREHENSIVE RHYTHM GUIDE · {Object.keys(RHYTHMS).length} RHYTHMS</div>
           </div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -1987,6 +2107,7 @@ export default function ECGSimulatorGuide() {
                 <div style={{position:"absolute",top:7,right:10,fontSize:10,color:"#475569"}}>25 mm/s · 10 mm/mV</div>
                 <div style={{position:"absolute",bottom:7,left:10,fontSize:10,color:"#475569"}}>{current.abbr}</div>
                 {current.bpm===0&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:16,fontWeight:700,color:"#ef4444",letterSpacing:".15em",textShadow:"0 0 20px rgba(239,68,68,0.5)"}}>NO OUTPUT</div>}
+                {rhythm==="pea"&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center",fontSize:15,fontWeight:700,color:"#f59e0b",letterSpacing:".13em",textShadow:"0 0 20px rgba(245,158,11,0.45)"}}>NO PULSE<div style={{fontSize:10,letterSpacing:".1em",opacity:.85,marginTop:3}}>CHECK THE PATIENT, NOT THE MONITOR</div></div>}
               </div>
             </>
           )}
