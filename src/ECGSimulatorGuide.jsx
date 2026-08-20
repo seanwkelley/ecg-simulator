@@ -545,6 +545,291 @@ const WAVE_COMPONENTS = [
 
 const CATEGORIES = ["All","Normal","Bradycardia","Tachycardia","Arrhythmia","Conduction","Ischemia","Metabolic","Paced","Emergency"];
 
+/* ═══════════════ BEAT TIMING & AUSCULTATION MODEL ═══════════════
+   One clock drives both the trace and the sound, so what you hear always
+   lines up with what is drawn. The constants below are the medical content
+   of the audio — sources are cited per rhythm in RHYTHM_AUDIO.note.
+
+   Three findings drove this model:
+
+   1. S1→S2 is NOT a fixed fraction of the cardiac cycle. Weissler's
+      electromechanical systole QS2 (ms) ≈ 546 − 2.1 × HR (Weissler et al.,
+      Circulation 1968). Systole shortens far less than diastole as the rate
+      climbs: 395 ms of a 833 ms cycle at 72 bpm (47%), but 168 ms of a 333 ms
+      cycle at 180 bpm (50%). That is why a fast rhythm collapses from
+      "lub-dub … lub-dub" into the evenly spaced tic-toc of embryocardia.
+
+   2. S1 intensity tracks where the mitral leaflets sit at the onset of
+      systole, i.e. the PR interval — or, when there is no fixed PR, the
+      preceding R-R. Short PR / short cycle → leaflets still wide open →
+      loud S1. Long PR → soft S1. Beyond PR ≈ 0.50 s the valve reopens
+      (Circulation 1974;50:17). This is the mechanism behind variable S1 in
+      AF, complete heart block, VT and Mobitz I.
+
+   3. A monitor's QRS tone fires on a DETECTED QRS. A dropped beat is
+      silent; VF, asystole and torsades produce no tone at all — they
+      produce an alarm. The continuous flatline tone is a Hollywood
+      invention, not something a real monitor does.                        */
+
+const RESP_PERIOD = 4.0;    // s — ~15 breaths/min; drives split S2 and RSA
+const MORPH_EXTENT = 0.80;  // fraction of the reference cycle the drawn P-QRS-T occupies
+
+// Weissler: total electromechanical systole, Q wave to the aortic component of
+// S2. The regression was derived over roughly 40–110 bpm; extrapolated past
+// that it eventually predicts systole shrinking faster than the cycle, which is
+// wrong. Above 110 we hold QS2 at the fraction of the cycle the regression
+// itself reaches there (57.8%) — continuous at the join, and it reproduces the
+// equal-spaced tic-toc of embryocardia at tachycardic rates.
+const qs2Seconds = (hr) => {
+  const h = Math.min(230, Math.max(35, hr));
+  return h <= 110 ? (546 - 2.1 * h) / 1000 : (546 - 2.1 * 110) / 1000 * (110 / h);
+};
+
+/* Per-rhythm audio profile.
+   group    — length of the repeating beat pattern (drives morphology + timing)
+   rPhase   — phase of the R peak inside the drawn beat (where the tone fires)
+   alarm    — "high" | "medium" | null, per IEC 60601-1-8 priority
+   tone     — false when the monitor cannot derive a QRS (no tone at all)
+   note     — what a clinician should actually hear, shown in the UI          */
+const RHYTHM_AUDIO = {
+  normal_sinus: { rsa: 0.045,
+    note: "Even lub-dub at 72. Not metronomic — respiratory sinus arrhythmia speeds the rate on inspiration and slows it on expiration (P-P varies < 120 ms in health). S2 splits into A2-P2 at end-inspiration and fuses on expiration." },
+  sinus_bradycardia: { rsa: 0.05, alarm: "medium",
+    note: "Slow and regular. Systole barely lengthens (QS2 ≈ 445 ms at 48 bpm) so diastole does all the stretching — a long silent gap between dub and the next lub. A HR-low alarm fires below the usual 50 bpm limit." },
+  sinus_tachycardia: { rsa: 0.015, alarm: "medium",
+    note: "Fast, regular, gradual onset. Systole (QS2 ≈ 266 ms) now fills well over half the cycle, so lub-dub starts to sound evenly spaced — early embryocardia. HR-high alarm above the 120 bpm limit." },
+  svt: { rPhase: 0.327, s1: 1.2, s4: 0, alarm: "medium",
+    note: "Abrupt onset, unvarying, 180 bpm. Full embryocardia: QS2 ≈ 192 ms of a 333 ms cycle, so S1 and S2 fall almost equally spaced — a tic-toc, not a lub-dub. In AVNRT the atria contract against shut AV valves (cannon a-waves, 'frog sign') and there is no S4." },
+  atrial_fibrillation: { rPhase: 0.365, af: true, s4: 0,
+    note: "Irregularly irregular — no two cycles alike, successive R-R differing by well over 20 ms. S1 intensity varies beat to beat because the preceding cycle sets leaflet position: a short cycle gives a loud S1, a long one a soft S1. Beats following a very short cycle eject little and produce a weak S2 — the pulse deficit. No S4: the atria never organise." },
+  atrial_flutter: { rPhase: 0.389, s4: 0,
+    note: "Regular at 75 (300 bpm flutter with fixed 4:1 block). Sounds indistinguishable from sinus at the bedside — the sawtooth is a visual diagnosis, not an audible one. No S4, because atrial contraction is not effective." },
+  first_degree_block: { prDelay: 1, s1: 0.5, rsa: 0.03, s4: 0.6,
+    note: "Regular, but S1 is SOFT. The long PR lets the mitral leaflets drift back toward closed before the ventricle contracts, so there is less left to slam shut. The atrial kick separates out as an audible S4 ahead of S1." },
+  second_degree_type1: { group: 4, wenckebach: true,
+    note: "Group beating. The R-R intervals get progressively SHORTER through the group — PR lengthens by shrinking increments — and S1 gets progressively softer as PR grows. Then a beat is simply missing: no tone, no sound, a gap, and the cycle resets loud again." },
+  second_degree_type2: { group: 3, qrsWidth: 1.4,
+    note: "Regular, constant-intensity beats, then one is silently dropped and the gap is exactly two cycles long. Nothing warns you it is coming — unlike Wenckebach, the cadence does not tighten first." },
+  third_degree_block: { rPhase: 0.2025, chb: true, atrialRate: 75, alarm: "medium",
+    note: "Slow and metronomically regular, with S1 intensity wandering at random — the atria fire independently at 75, so the PR relationship is different every beat. When a P happens to land 0.10–0.20 s ahead of the QRS you get a bruit de canon: a single startlingly loud S1, the audible partner of the cannon a-wave in the neck." },
+  ventricular_tachycardia: { rPhase: 0.157, dissoc: true, jitter: 0.008, s2: 0.55, s4: 0, alarm: "high",
+    note: "Fast, wide and nearly regular — successive R-R vary by under 20 ms, which is what separates it from AF. AV dissociation makes S1 vary randomly, and the poorly filled ventricle ejects badly so S2 is faint. Red high-priority alarm." },
+  ventricular_fibrillation: { tone: false, silent: true, alarm: "high",
+    note: "NO QRS tone and NO heart sounds — there is no coordinated contraction to make any. What you hear is the monitor's red high-priority alarm: five pulses, repeated. Silence where the beeps were is itself the finding." },
+  asystole: { tone: false, silent: true, alarm: "high",
+    note: "Silence, then the red alarm. Real monitors do NOT emit the continuous flatline tone of film and television — that sound does not exist in clinical practice. Asystole announces itself as a repeating high-priority burst." },
+  torsades: { tone: false, silent: true, alarm: "high",
+    note: "No discrete QRS for the monitor to track, so no tone — only the red alarm. There is no organised mechanical systole, so there are no heart sounds." },
+  long_qt: { s4: 0.4,
+    note: "Sounds entirely normal — regular sinus at 60. The danger is silent: prolonged repolarisation is invisible to auscultation, and the first audible sign is the chaos of the torsades it causes." },
+  lbbb: { qrsWidth: 2.0, split: -45, s1: 0.85,
+    note: "Regular, but S2 splits PARADOXICALLY: the delayed left ventricle closes the aortic valve after the pulmonic, so P2 comes first. The split is audible on EXPIRATION and fuses on inspiration — the reverse of the normal pattern." },
+  rbbb: { qrsWidth: 1.8, split: 70,
+    note: "Regular, with WIDE splitting of S2. Late right ventricular emptying delays P2, so A2-P2 stays split through the whole respiratory cycle (~70 ms) and widens further on inspiration." },
+  pe_s1q3t3: { s4: 0.5, alarm: null,
+    note: "Sinus tachycardia is the real auscultatory finding in PE — S1Q3T3 is an ECG pattern, not a sound. Acute right heart strain may add a loud P2 and a right-sided S4." },
+  unifocal_pvc: { group: 5, pvcAt: [3], coupling: [0.55],
+    note: "Regular … then an EARLY beat with a sharp, loud S1 and little or no S2 — the premature ventricle ejects almost nothing, which is why the beat is often missing at the wrist. Then a full compensatory pause (the surrounding R-R is exactly two sinus cycles), and the post-pause beat lands with an extra-loud S1 from the long filling time." },
+  multifocal_pvc: { group: 7, pvcAt: [2, 5], coupling: [0.52, 0.66],
+    note: "Same early-beat-then-pause cadence as unifocal PVCs, but the coupling intervals DIFFER between ectopics — the ectopics arise from different foci, so they do not fall at the same distance after the sinus beat each time." },
+  stemi_anterior: { s4: 1.0, note: "Regular sinus with an S4 gallop. An audible atrial gallop is a near-universal finding in the acute phase of infarction while sinus rhythm persists — the stiff, ischaemic ventricle resists the atrial kick." },
+  stemi_inferior: { s4: 1.0, note: "Regular, often slow (vagal tone / RCA supply to the SA and AV nodes), with an S4 gallop of acute ischaemia. Watch for the rate falling as block develops." },
+  stemi_lateral: { s4: 1.0, note: "Regular sinus with the S4 gallop of acute ischaemia." },
+  stemi_posterior: { s4: 1.0, note: "Regular sinus with the S4 gallop of acute ischaemia — nothing audible distinguishes the posterior territory." },
+  stemi_rv: { s4: 1.0, note: "Regular with an S4. RV infarction is preload-dependent — a right-sided S4 and raised JVP with clear lungs is the classic bedside triad." },
+  wellens: { s4: 0.7, note: "Sounds normal, and that is the trap. Wellens is a pain-free interval with a critical LAD lesion behind it — the ECG is the only thing shouting." },
+  dewinter: { s4: 0.9, note: "Regular sinus, often mildly tachycardic, with an S4. As with Wellens, the emergency is entirely electrical — auscultation will not find it." },
+  pericarditis: { rub: true, s4: 0,
+    note: "The finding is a PERICARDIAL FRICTION RUB — a scratchy, leathery, high-pitched sound with up to three components per cycle (atrial systole, ventricular systole, early diastole). It is superficial, closest to the chest wall, and loudest sitting forward in expiration." },
+  brugada: { note: "Sounds completely normal. Brugada is a channelopathy — the only warning is the coved ST in V1-V2 and the arrhythmic history." },
+  hyperkalemia_mild: { s4: 0, note: "Regular, unremarkable. The flattening P waves mean atrial contraction is already failing, so the S4 disappears before anything else changes." },
+  hyperkalemia_severe: { rPhase: 0.25, s1: 0.3, s2: 0.15, s4: 0, alarm: "high",
+    note: "Barely audible. The sine wave is pre-arrest: the myocardium is depolarised and contracting feebly, so the heart sounds fade to almost nothing even though the monitor still counts a rate. Red alarm." },
+  hypokalemia: { s4: 0.5, note: "Regular; the U wave is electrical only. What matters is that this substrate breaks into torsades — which is audible only as an alarm." },
+  hypothermia: { s1: 0.7, s2: 0.7, rsa: 0.02, alarm: "medium",
+    note: "Slow and quiet. Cold myocardium contracts sluggishly and the sounds are distant; the J waves are silent. HR-low alarm below the 50 bpm limit." },
+  digoxin_effect: { s4: 0.5, note: "Regular and unremarkable at therapeutic levels. Toxicity is what becomes audible — variable S1 as AV block and ectopy appear." },
+  wpw: { qrsWidth: 1.4, s1: 1.3,
+    note: "Regular with a LOUD S1 — the short PR means the AV valves are still fully open when the ventricle fires. Pre-excitation shortens the mechanical PR just as it shortens the electrical one." },
+  paced_ventricular: { qrsWidth: 2.0, split: -40, s4: 0,
+    note: "Machine-perfect regularity — no respiratory variation at all, which is itself the giveaway. The pacing spike makes no sound. RV pacing activates the ventricles like an LBBB, so S2 splits paradoxically, and with no AV synchrony there is no S4." },
+  paced_dual: { qrsWidth: 1.9, split: -35, s4: 0.6,
+    note: "Machine-regular, but AV synchrony is restored — the atrial kick is timed, so an S4-like atrial sound returns ahead of S1. RV pacing still reverses the S2 split." },
+  junctional_escape: { s1: 1.15, s4: 0, alarm: "medium",
+    note: "Slow, regular, and S1 is loud: retrograde atrial activation contracts the atria almost simultaneously with the ventricles, so the valves are still wide open. Cannon a-waves are visible in the neck on every beat. HR-low alarm." },
+  aivr: { rPhase: 0.165, dissoc: true, s4: 0,
+    note: "Slow, wide and regular at 75 with a randomly varying S1 — the atria are dissociated, so leaflet position differs each beat. Occasional cannon sounds. Benign reperfusion rhythm: it sounds far less alarming than VT because it is." },
+};
+
+/* Beat clock. Emits beats with real R-R intervals and the auscultation
+   parameters that go with them. Deterministic (seeded) so a rhythm sounds
+   the same every time it is selected. */
+function makeBeatClock(rhythm) {
+  const def = RHYTHMS[rhythm] || RHYTHMS.normal_sinus;
+  const prof = RHYTHM_AUDIO[rhythm] || {};
+  const nominal = def.bpm > 0 ? 60 / def.bpm : 1;
+  let seed = 0x1f2e3d4;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const gauss = () => (rnd() + rnd() + rnd() + rnd() - 2) * 0.82; // ≈ N(0,1)
+
+  let idx = -1, tNow = 0, prevDur = nominal;
+
+  function build(i, startT) {
+    const g = prof.group || 1;
+    const n = ((i % g) + g) % g;
+    const priorDur = prevDur;   // length of the beat before this one
+    const resp = Math.sin((startT / RESP_PERIOD) * Math.PI * 2); // +1 = peak inspiration
+    const b = {
+      i, n, t: startT, dur: nominal,
+      qrs: !prof.silent, kind: "sinus",
+      prDelay: prof.prDelay || 0,
+      qrsWidth: prof.qrsWidth || 1,
+      s1: prof.s1 !== undefined ? prof.s1 : 1,
+      s2: prof.s2 !== undefined ? prof.s2 : 1,
+      s3: 0,
+      s4: prof.s4 !== undefined ? prof.s4 : 0,
+      rub: !!prof.rub,
+      // S2 split. Physiologic: near-fused on expiration, 50–60 ms at end-
+      // inspiration. A fixed positive value (RBBB) is a wide split that widens
+      // further with inspiration; a negative value (LBBB, RV pacing) is the
+      // reversed split, audible on expiration and narrowing on inspiration.
+      split: prof.split === undefined ? 12 + 45 * Math.max(0, resp)
+           : prof.split < 0 ? prof.split * (1 - 0.75 * Math.max(0, resp))
+           : prof.split * (1 + 0.3 * Math.max(0, resp)),
+      resp,
+    };
+
+    // Respiratory sinus arrhythmia — inspiration shortens the cycle.
+    if (prof.rsa) b.dur = nominal * (1 - prof.rsa * resp);
+
+    // Atrial fibrillation: irregularly irregular, log-normal R-R about the mean,
+    // floored at the AV node's refractory period, with concealed-conduction pauses.
+    if (prof.af) {
+      // 0.87 compensates for the upward skew of the log-normal plus the
+      // concealed-conduction pauses, so the mean R-R still lands on the rate.
+      let d = nominal * 0.87 * Math.exp(0.21 * gauss());
+      if (rnd() < 0.22) d *= 1.25 + 0.35 * rnd();          // concealed conduction
+      d = Math.min(1.7, Math.max(0.30, d));
+      if (Math.abs(d - priorDur) < 0.02) d += (d >= priorDur ? 0.03 : -0.03); // always > 20 ms apart
+      b.dur = Math.min(1.7, Math.max(0.30, d));
+      // Preceding cycle sets leaflet position (S1) and filling (S2 / pulse).
+      const f = priorDur / nominal;
+      b.s1 = Math.min(1.6, Math.max(0.40, 2.0 - 1.05 * f));
+      b.s2 = Math.min(1.15, Math.max(0, (f - 0.30) / 0.85));
+    }
+
+    // Wenckebach: PR grows by shrinking increments, so R-R progressively shortens
+    // before the dropped beat. P-P stays constant.
+    if (prof.wenckebach) {
+      const PP = nominal, PR = [0.16, 0.28, 0.34];
+      if (n === 3) { b.qrs = false; b.kind = "dropped"; b.dur = PP; b.s1 = 0; b.s2 = 0; b.s4 = 0; }
+      else {
+        b.prDelay = [0, 0.4, 0.8][n];
+        b.dur = n === 0 ? PP + (PR[1] - PR[0])
+              : n === 1 ? PP + (PR[2] - PR[1])
+              :           PP - (PR[2] - PR[0]);
+        b.s1 = 1.25 - 0.55 * (PR[n] - PR[0]) / 0.18;  // softer as PR lengthens
+        b.s4 = 0.4;
+      }
+    }
+
+    // Mobitz II: constant PR, sudden dropped beat, pause = exactly two cycles.
+    if (prof.group === 3 && rhythm === "second_degree_type2" && n === 2) {
+      b.qrs = false; b.kind = "dropped"; b.s1 = 0; b.s2 = 0; b.s4 = 0;
+    }
+
+    // Complete heart block: S1 intensity set by wherever the dissociated P
+    // happens to fall relative to this QRS. Matches the P waves being drawn.
+    if (prof.chb) {
+      const aP = 60 / (prof.atrialRate || 75);
+      const tQRS = startT + b.dur * (prof.rPhase || 0.2);
+      const lastP = Math.floor((tQRS - aP * 0.115) / aP) * aP + aP * 0.115;
+      const pr = tQRS - lastP;
+      // S1 intensity vs PR (Circulation 1974;50:17): loudest when the leaflets
+      // are still maximally open at ~0.14 s, falling away as PR lengthens, and
+      // rising slightly again past 0.50 s when the mitral valve reopens.
+      b.s1 = pr < 0.05  ? 0.60 + 6.0 * pr
+           : pr <= 0.14 ? 0.90 + 7.8 * (pr - 0.05)
+           : pr <= 0.50 ? Math.max(0.35, 1.60 - 2.9 * (pr - 0.14))
+           :              0.70;
+      if (b.s1 > 1.45) b.kind = "cannon";              // bruit de canon
+      b.pr = pr;
+    }
+
+    // AV dissociation without a modelled atrial trace (VT, AIVR): S1 wanders.
+    if (prof.dissoc) {
+      b.s1 = 0.45 + 1.15 * rnd();
+      if (b.s1 > 1.45) b.kind = "cannon";
+    }
+    if (prof.jitter) b.dur = nominal + (rnd() - 0.5) * 2 * prof.jitter;
+
+    // PVCs: early beat, then a FULL compensatory pause — the interval spanning
+    // the ectopic equals two sinus cycles.
+    if (prof.pvcAt) {
+      const k = prof.pvcAt.indexOf(n);
+      const nextIsPvc = prof.pvcAt.indexOf((n + 1) % g);
+      const prevWasPvc = prof.pvcAt.includes((n - 1 + g) % g);
+      if (k >= 0) {
+        b.kind = "pvc";
+        b.dur = 2 * nominal - nominal * prof.coupling[k];  // full compensatory pause
+        b.s1 = 1.35;                                       // sharp, loud
+        b.s2 = 0.15;                                       // ejects almost nothing
+        b.s4 = 0;
+        b.rPhase = n === 5 ? 0.128 : 0.117;
+      } else if (nextIsPvc >= 0) {
+        // sinus beat immediately before the ectopic — cut short by it
+        b.dur = nominal * prof.coupling[nextIsPvc];
+      } else if (prevWasPvc) {
+        b.s1 = 1.3;   // post-extrasystolic potentiation after the long pause
+        b.s2 = 1.15;
+      }
+    }
+
+    // Morphology reference: long beats keep normal wave widths and gain flat
+    // diastole; genuinely early beats compress rather than truncate mid-T.
+    b.ref = Math.min(nominal, Math.max(b.dur / MORPH_EXTENT, nominal * 0.55));
+    if (b.rPhase === undefined) {
+      b.rPhase = prof.rPhase !== undefined ? prof.rPhase
+               : 0.24 + b.prDelay * 0.1 + 0.026 * b.qrsWidth;
+    }
+    // Weissler QS2 from the PRECEDING cycle — filling time sets ejection time.
+    b.qs2 = qs2Seconds(60 / Math.max(0.25, priorDur));
+    prevDur = b.dur;
+    return schedule(b);
+  }
+
+  /* Turn a beat into a list of [seconds-after-beat-start, sound] events.
+     A beat with no QRS produces none at all — that is the point. */
+  function schedule(b) {
+    b.ev = [];
+    if (!b.qrs) return b;
+    const r = b.rPhase * b.ref;                       // R wave / S1
+    if (b.s4 > 0 && r - 0.065 > 0.002) b.ev.push([r - 0.065, "s4"]);
+    b.ev.push([r, "s1"]);
+    // S1 → S2 is Weissler's QS2 measured from QRS ONSET, and S1 lags onset ~30 ms.
+    const s2t = Math.min(r + b.qs2 - 0.03, b.dur * 0.94);
+    if (b.s2 > 0.01 && s2t > r) b.ev.push([s2t, "s2"]);
+    if (b.s3 > 0) {
+      const t3 = Math.min(s2t + 0.14, b.dur * 0.97);
+      if (t3 > s2t) b.ev.push([t3, "s3"]);
+    }
+    if (b.rub) {  // triphasic: atrial systole, ventricular systole, early diastole
+      b.ev.push([Math.max(0.002, r - 0.05), "rub"]);
+      b.ev.push([r + 0.07, "rub"]);
+      b.ev.push([Math.min(s2t + 0.09, b.dur * 0.96), "rub"]);
+    }
+    b.ev.sort((x, y) => x[0] - y[0]);
+    return b;
+  }
+
+  return {
+    nominal,
+    profile: prof,
+    next() { idx += 1; const b = build(idx, tNow); tNow += b.dur; return b; },
+    reset() { idx = -1; tNow = 0; prevDur = nominal; seed = 0x1f2e3d4; },
+  };
+}
+
 /* ═══════════════════ WAVEFORM GENERATOR ═══════════════════ */
 
 // Polarity controls QRS/P/T flip (axis-driven, e.g. aVR).
@@ -677,8 +962,12 @@ function normalBeat(phase, opts = {}) {
   return val;
 }
 
-function generateECGPoint(t, rhythm, beatPhase, leadMod) {
-  const ph = beatPhase % 1;
+// `beat` comes from makeBeatClock: it carries the beat's index within the
+// rhythm's repeating group and its PR delay, so morphology and audio agree.
+// `beatPhase` may exceed 1 — the excess is flat diastole after a long R-R.
+function generateECGPoint(t, rhythm, beatPhase, leadMod, beat) {
+  const ph = beatPhase;
+  const bn = beat ? beat.n : 0;
   const lm = leadMod || LEAD_MODS.II;
   const ax = lm.axis || 1;
 
@@ -761,17 +1050,14 @@ function generateECGPoint(t, rhythm, beatPhase, leadMod) {
   if (rhythm === "first_degree_block") return leadNormal(ph, { prDelay:1 });
 
   if (rhythm === "second_degree_type1") {
-    const cyc = (t*RHYTHMS[rhythm].bpm/60)%4;
-    const bn = Math.floor(cyc), ib = cyc-bn;
-    if (bn===3) { if (ib>0.06&&ib<0.17) return ax*0.15*(lm.pAmp||1)*Math.sin(((ib-0.06)/0.11)*Math.PI); return 0; }
-    return leadNormal(ib, { prDelay:[0,0.4,0.8][bn] });
+    // Beat 3 of the group is the dropped one: a P wave with no QRS behind it.
+    if (bn===3) { if (ph>0.06&&ph<0.17) return ax*0.15*(lm.pAmp||1)*Math.sin(((ph-0.06)/0.11)*Math.PI); return 0; }
+    return leadNormal(ph, { prDelay: beat ? beat.prDelay : [0,0.4,0.8][bn] });
   }
 
   if (rhythm === "second_degree_type2") {
-    const cyc = (t*RHYTHMS[rhythm].bpm/60)%3;
-    const bn = Math.floor(cyc), ib = cyc-bn;
-    if (bn===2) { if (ib>0.06&&ib<0.17) return ax*0.15*(lm.pAmp||1)*Math.sin(((ib-0.06)/0.11)*Math.PI); return 0; }
-    return leadNormal(ib, { qrsWidth:1.4 });
+    if (bn===2) { if (ph>0.06&&ph<0.17) return ax*0.15*(lm.pAmp||1)*Math.sin(((ph-0.06)/0.11)*Math.PI); return 0; }
+    return leadNormal(ph, { qrsWidth:1.4 });
   }
 
   if (rhythm === "third_degree_block") {
@@ -806,7 +1092,6 @@ function generateECGPoint(t, rhythm, beatPhase, leadMod) {
   if (rhythm === "pe_s1q3t3") return leadNormal(ph, { rAmp:0.75, bigQ:true, tInvert:true, tAmp:0.5 });
 
   if (rhythm === "unifocal_pvc") {
-    const bn = Math.floor(t*RHYTHMS[rhythm].bpm/60)%5;
     if (bn===3) {
       if (ph<0.06) return 0;
       if (ph>0.06&&ph<0.22) { const q=(ph-0.06)/0.16; const v = q<0.08?-0.25*(q/0.08):q<0.35?-0.25+1.35*((q-0.08)/0.27):q<0.65?1.1*(1-(q-0.35)/0.3):-0.3*(1-(q-0.65)/0.35); return ax*v*(lm.rAmp||1); }
@@ -885,7 +1170,6 @@ function generateECGPoint(t, rhythm, beatPhase, leadMod) {
   }
 
   if (rhythm === "multifocal_pvc") {
-    const bn = Math.floor(t*RHYTHMS[rhythm].bpm/60)%7;
     if (bn===2) {
       if (ph>0.05&&ph<0.22) { const q=(ph-0.05)/0.17; const v = q<0.1?-0.2*(q/0.1):q<0.4?-0.2+1.4*((q-0.1)/0.3):q<0.7?1.2*(1-(q-0.4)/0.3):-0.25*(1-(q-0.7)/0.3); return ax*v*(lm.rAmp||1); }
       if (ph>0.26&&ph<0.38) return ax*-0.25*(lm.tAmp||1)*Math.sin(((ph-0.26)/0.12)*Math.PI);
@@ -910,7 +1194,9 @@ function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II", onBeat
   const dataRef = useRef([]);
   const timeRef = useRef(0);
   const lastFrameRef = useRef(0);
-  const beatAccRef = useRef(0);
+  const clockRef = useRef(null);
+  const beatRef = useRef(null);
+  const elapsedRef = useRef(0);
   // Kept in a ref so changing the handler doesn't tear down the animation loop.
   const onBeatRef = useRef(onBeat);
   useEffect(()=>{ onBeatRef.current = onBeat; },[onBeat]);
@@ -934,24 +1220,29 @@ function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II", onBeat
     lastFrameRef.current = ts;
 
     if (isRunning) {
-      const bpm = RHYTHMS[rhythm].bpm||60;
+      if (!clockRef.current) { clockRef.current = makeBeatClock(rhythm); beatRef.current = clockRef.current.next(); elapsedRef.current = 0; }
       const pps = 85*speed;
       const n = Math.max(1, Math.round(pps*dt));
+      const step = 1/pps;
       for (let i=0;i<n;i++) {
-        timeRef.current += 1/pps;
-        const prev = beatAccRef.current;
-        beatAccRef.current += (1/pps)/(60/bpm);
-        const wrapped = beatAccRef.current>=1;
-        if (wrapped) beatAccRef.current-=1;
-        const cur = beatAccRef.current;
-        // Fire beat events as the beat phase sweeps past the R wave (~0.27) and
-        // the end of the T wave (~0.62). `wrapped` handles the 1→0 rollover.
-        if (onBeatRef.current && bpm>0) {
-          const crossed = p => wrapped ? (prev<p || cur>=p) : (prev<p && cur>=p);
-          if (crossed(0.27)) onBeatRef.current("s1");
-          if (crossed(0.62)) onBeatRef.current("s2");
+        timeRef.current += step;
+        let beat = beatRef.current;
+        const from = elapsedRef.current;
+        let to = from + step;
+        // Sound events sit at real times inside the beat, so a dropped QRS or a
+        // compensatory pause is genuinely silent rather than beeping on schedule.
+        if (onBeatRef.current) {
+          for (const [when, kind] of beat.ev) if (when>from && when<=to) onBeatRef.current(kind, beat);
         }
-        dataRef.current.push(generateECGPoint(timeRef.current, rhythm, cur, leadMod));
+        if (to >= beat.dur) {
+          to -= beat.dur;
+          beat = beatRef.current = clockRef.current.next();
+          if (onBeatRef.current) {
+            for (const [when, kind] of beat.ev) if (when<=to) onBeatRef.current(kind, beat);
+          }
+        }
+        elapsedRef.current = to;
+        dataRef.current.push(generateECGPoint(timeRef.current, rhythm, to/beat.ref, leadMod, beat));
       }
       if (dataRef.current.length > w+20) dataRef.current = dataRef.current.slice(-(Math.floor(w)+20));
     }
@@ -1001,7 +1292,10 @@ function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II", onBeat
   }, [rhythm, isRunning, speed, leadMod]);
 
   useEffect(()=>{animRef.current=requestAnimationFrame(draw);return()=>{if(animRef.current)cancelAnimationFrame(animRef.current)}},[draw]);
-  useEffect(()=>{dataRef.current=[];timeRef.current=0;beatAccRef.current=0;lastFrameRef.current=0},[rhythm,leadName]);
+  useEffect(()=>{
+    dataRef.current=[];timeRef.current=0;lastFrameRef.current=0;elapsedRef.current=0;
+    clockRef.current=makeBeatClock(rhythm);beatRef.current=clockRef.current.next();
+  },[rhythm,leadName]);
 
   return <canvas ref={canvasRef} style={{width:"100%",height,display:"block"}}/>;
 }
@@ -1013,7 +1307,9 @@ function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70 }) {
   const dataRef = useRef([]);
   const timeRef = useRef(0);
   const lastFrameRef = useRef(0);
-  const beatAccRef = useRef(0);
+  const clockRef = useRef(null);
+  const beatRef = useRef(null);
+  const elapsedRef = useRef(0);
 
   const leadMod = useMemo(() => {
     const base = LEAD_MODS[leadName] || LEAD_MODS.II;
@@ -1033,14 +1329,17 @@ function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70 }) {
     lastFrameRef.current = ts;
 
     if (isRunning) {
-      const bpm = RHYTHMS[rhythm].bpm||60;
+      if (!clockRef.current) { clockRef.current = makeBeatClock(rhythm); beatRef.current = clockRef.current.next(); elapsedRef.current = 0; }
       const pps = 60*speed;
       const n = Math.max(1, Math.round(pps*dt));
+      const step = 1/pps;
       for (let i=0;i<n;i++) {
-        timeRef.current += 1/pps;
-        beatAccRef.current += (1/pps)/(60/bpm);
-        if (beatAccRef.current>=1) beatAccRef.current-=1;
-        dataRef.current.push(generateECGPoint(timeRef.current, rhythm, beatAccRef.current, leadMod));
+        timeRef.current += step;
+        let beat = beatRef.current;
+        let to = elapsedRef.current + step;
+        if (to >= beat.dur) { to -= beat.dur; beat = beatRef.current = clockRef.current.next(); }
+        elapsedRef.current = to;
+        dataRef.current.push(generateECGPoint(timeRef.current, rhythm, to/beat.ref, leadMod, beat));
       }
       if (dataRef.current.length > w+10) dataRef.current = dataRef.current.slice(-(Math.floor(w)+10));
     }
@@ -1061,7 +1360,10 @@ function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70 }) {
   }, [rhythm, isRunning, speed, leadMod]);
 
   useEffect(()=>{animRef.current=requestAnimationFrame(draw);return()=>{if(animRef.current)cancelAnimationFrame(animRef.current)}},[draw]);
-  useEffect(()=>{dataRef.current=[];timeRef.current=0;beatAccRef.current=0;lastFrameRef.current=0},[rhythm,leadName]);
+  useEffect(()=>{
+    dataRef.current=[];timeRef.current=0;lastFrameRef.current=0;elapsedRef.current=0;
+    clockRef.current=makeBeatClock(rhythm);beatRef.current=clockRef.current.next();
+  },[rhythm,leadName]);
 
   return <canvas ref={canvasRef} style={{width:"100%",height,display:"block",borderRadius:4}}/>;
 }
@@ -1088,51 +1390,186 @@ function ShockBadge({ shockable }) {
 }
 
 /* ─── Audio ────────────────────────────────────────────────────────────────
-   Web Audio synth. Two modes:
-     beep   — monitor tone on every R wave
-     heart  — synthesised S1 ("lub") at QRS, S2 ("dub") after the T wave
+   Two modes, modelled on what each is in real life.
+
+   MONITOR — the QRS tone a bedside monitor emits when it detects a QRS,
+   plus IEC 60601-1-8 alarm bursts. Philips IntelliVue modulates the tone
+   with SpO2 as f = 662 Hz / 2^((100 − SpO2)/24), so a normally saturated
+   patient sits at 662 Hz; that is the pitch used here. Rhythms with no
+   detectable QRS get no tone — only the alarm.
+
+   AUSCULTATION — synthesised valve sounds. S1 is two components (M1 then
+   T1 ≈ 25 ms later), 20–150 Hz, 70–150 ms long. S2 is A2 then P2 with a
+   split that follows respiration (fused on expiration, 50–60 ms at end-
+   inspiration), 50–250 Hz, 60–120 ms long, sharper and shorter than S1.
+   S3, S4 and the pericardial friction rub are generated on demand.
+
    The AudioContext is created lazily on the user's first click, because
    browsers block audio started without a gesture.                          */
 function createSoundEngine() {
-  let ctx = null;
+  let ctx = null, master = null, noiseBuf = null;
   const ensure = () => {
-    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain();
+      master.gain.value = 0.9;
+      master.connect(ctx.destination);
+    }
     if (ctx.state === "suspended") ctx.resume();
     return ctx;
   };
-  // Short electronic monitor blip.
-  const beep = () => {
-    const c = ensure(), t = c.currentTime;
-    const o = c.createOscillator(), g = c.createGain();
-    o.type = "sine";
-    o.frequency.setValueAtTime(880, t);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.2, t + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
-    o.connect(g).connect(c.destination);
-    o.start(t); o.stop(t + 0.09);
+  const noise = (c) => {
+    if (!noiseBuf) {
+      noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return noiseBuf;
   };
-  // Valve sound: low sine with a downward pitch sweep through a lowpass —
-  // approximates the dull thud of valve closure.
-  const thud = (freq, dur, vol) => {
+
+  /* Monitor QRS tone — short, click-like, fixed pitch at normal saturation. */
+  const qrsTone = (spo2 = 100, vol = 0.22) => {
     const c = ensure(), t = c.currentTime;
-    const o = c.createOscillator(), g = c.createGain(), f = c.createBiquadFilter();
-    f.type = "lowpass"; f.frequency.setValueAtTime(180, t);
-    o.type = "sine";
-    o.frequency.setValueAtTime(freq, t);
-    o.frequency.exponentialRampToValueAtTime(freq * 0.55, t + dur);
+    const f = 662 / Math.pow(2, (100 - Math.min(100, spo2)) / 24);
+    const g = c.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.012);
+    g.gain.linearRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.075);
+    g.connect(master);
+    [[1, 1], [2, 0.18]].forEach(([mult, amp]) => {
+      const o = c.createOscillator(), og = c.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(f * mult, t);
+      og.gain.value = amp;
+      o.connect(og).connect(g);
+      o.start(t); o.stop(t + 0.1);
+    });
+  };
+
+  /* Valve sound: band-limited noise for the body, a swept sine for the pitch. */
+  const valve = (at, centre, dur, vol, q = 1.4) => {
+    if (vol <= 0.001) return;
+    const c = ensure(), t = c.currentTime + Math.max(0, at);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.010);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(f); f.connect(g); g.connect(c.destination);
-    o.start(t); o.stop(t + dur + 0.02);
+    g.connect(master);
+
+    const src = c.createBufferSource(); src.buffer = noise(c); src.loop = true;
+    const bp = c.createBiquadFilter(); bp.type = "bandpass";
+    bp.frequency.setValueAtTime(centre * 1.6, t); bp.Q.value = q;
+    const ng = c.createGain(); ng.gain.value = 0.65;
+    src.connect(bp).connect(ng).connect(g);
+    src.start(t); src.stop(t + dur + 0.03);
+
+    const o = c.createOscillator(), og = c.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(centre, t);
+    o.frequency.exponentialRampToValueAtTime(centre * 0.6, t + dur);
+    og.gain.value = 0.9;
+    o.connect(og).connect(g);
+    o.start(t); o.stop(t + dur + 0.03);
   };
-  return {
-    beep,
-    s1: () => thud(58, 0.13, 0.5),   // louder, longer — mitral/tricuspid closure
-    s2: () => thud(78, 0.09, 0.3),   // sharper, quieter — aortic/pulmonic closure
-    resume: () => ensure(),
+
+  // S1 — mitral (M1) then tricuspid (T1) ~25 ms later; low, long, dull.
+  const s1 = (gain = 1) => {
+    valve(0,     52, 0.115, 0.42 * gain, 1.2);
+    valve(0.025, 62, 0.075, 0.16 * gain, 1.4);
   };
+  // S2 — aortic (A2) then pulmonic (P2) at +split ms. Negative split = P2
+  // first, i.e. the paradoxical/reversed split of LBBB and RV pacing.
+  const s2 = (gain = 1, splitMs = 25) => {
+    const s = Math.abs(splitMs) / 1000;
+    const rev = splitMs < 0;
+    valve(rev ? s : 0, 86, 0.070, 0.30 * gain, 1.6);              // A2
+    valve(rev ? 0 : s, 78, 0.055, 0.17 * gain, 1.6);              // P2
+  };
+  const s3 = (gain = 1) => valve(0, 34, 0.090, 0.16 * gain, 1.0); // early-diastolic, dull
+  const s4 = (gain = 1) => valve(0, 30, 0.075, 0.15 * gain, 1.0); // presystolic atrial kick
+
+  // Pericardial friction rub — scratchy, leathery, high-pitched, superficial.
+  const rub = (gain = 1) => {
+    const c = ensure(), t = c.currentTime;
+    const src = c.createBufferSource(); src.buffer = noise(c); src.loop = true;
+    const bp = c.createBiquadFilter(); bp.type = "bandpass";
+    bp.frequency.setValueAtTime(520, t); bp.Q.value = 0.9;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, t);
+    // Jagged envelope — the grating quality comes from the amplitude, not the pitch
+    const steps = [0.10, 0.03, 0.13, 0.05, 0.09, 0.02];
+    steps.forEach((v, i) => g.gain.linearRampToValueAtTime(v * gain, t + 0.012 + i * 0.018));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    src.connect(bp).connect(g).connect(master);
+    src.start(t); src.stop(t + 0.16);
+  };
+
+  /* IEC 60601-1-8 alarm bursts. A pulse carries a fundamental in 150–1000 Hz
+     with at least four harmonics in 300–4000 Hz, all within 15 dB of each
+     other, and rise/fall times of 10–20% of the pulse. High priority is a
+     burst of five pulses grouped 3 + 2, and the burst repeats.             */
+  let alarmNodes = [];
+  const alarmPulse = (at, f0, dur, vol) => {
+    const c = ensure(), t = c.currentTime + at;
+    const g = c.createGain();
+    alarmNodes.push(g);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + dur * 0.15);
+    g.gain.setValueAtTime(vol, t + dur * 0.8);
+    g.gain.linearRampToValueAtTime(0, t + dur);
+    g.connect(master);
+    [[1, 1], [2, 0.5], [3, 0.36], [4, 0.26], [5, 0.2]].forEach(([m, a]) => {
+      const o = c.createOscillator(), og = c.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(f0 * m, t);
+      og.gain.value = a;
+      o.connect(og).connect(g);
+      o.start(t); o.stop(t + dur + 0.01);
+    });
+  };
+  // Returns the length of the sequence so the caller can time the repeat.
+  const alarm = (priority) => {
+    ensure();
+    if (priority === "high") {
+      const d = 0.14, gaps = [0.10, 0.10, 0.34, 0.10];
+      let len = 0;
+      for (let burst = 0; burst < 2; burst++) {
+        let at = burst * 1.69;
+        for (let p = 0; p < 5; p++) {
+          alarmPulse(at, 494, d, 0.16);
+          at += d + (gaps[p] || 0);
+        }
+        len = at + 0.35;
+      }
+      return len;
+    }
+    if (priority === "medium") {
+      const d = 0.17;
+      let at = 0;
+      for (let p = 0; p < 3; p++) { alarmPulse(at, 392, d, 0.10); at += d + 0.13; }
+      return at;
+    }
+    return 0;
+  };
+  // Alarm pulses are scheduled ahead of time, so leaving an arrest rhythm has
+  // to tear the queued ones down or the alarm keeps sounding over the next.
+  const stopAlarm = () => {
+    const c = ctx;
+    alarmNodes.forEach(g => {
+      try { g.gain.cancelScheduledValues(c ? c.currentTime : 0); g.gain.value = 0; g.disconnect(); } catch (e) { /* already gone */ }
+    });
+    alarmNodes = [];
+  };
+
+  return { qrsTone, s1, s2, s3, s4, rub, alarm, stopAlarm, resume: () => ensure() };
+}
+
+/* Which alarm a bedside monitor would raise. Explicit red list first, then
+   the default HR limits most units ship with (low 50, high 120). */
+function alarmPriority(rhythm) {
+  const prof = RHYTHM_AUDIO[rhythm] || {};
+  if (prof.alarm !== undefined) return prof.alarm;
+  const bpm = (RHYTHMS[rhythm] || {}).bpm || 0;
+  if (bpm > 0 && (bpm < 50 || bpm > 120)) return "medium";
+  return null;
 }
 
 /* ─── Lead-view diagrams ───────────────────────────────────────────────── */
@@ -1389,12 +1826,42 @@ export default function ECGSimulatorGuide() {
   useEffect(()=>{const c=()=>setIsMobile(window.innerWidth<=840);c();window.addEventListener("resize",c);return()=>window.removeEventListener("resize",c)},[]);
 
   const engineRef = useRef(null);
-  const handleBeat = useCallback((kind)=>{
+  const handleBeat = useCallback((kind, beat)=>{
     if (!soundOn) return;
     const e = engineRef.current || (engineRef.current = createSoundEngine());
-    if (soundMode==="beep") { if (kind==="s1") e.beep(); }   // monitor blips on R only
-    else if (kind==="s1") e.s1(); else e.s2();
-  },[soundOn,soundMode]);
+    const prof = RHYTHM_AUDIO[rhythm] || {};
+    if (soundMode==="beep") {
+      // A monitor tones on a DETECTED QRS and does nothing else. Rhythms with
+      // no derivable QRS (VF, asystole, TdP) stay silent — the alarm speaks.
+      if (kind==="s1" && prof.tone !== false) e.qrsTone(100);
+      return;
+    }
+    if (kind==="s1") e.s1(beat ? beat.s1 : 1);
+    else if (kind==="s2") e.s2(beat ? beat.s2 : 1, beat ? beat.split : 25);
+    else if (kind==="s3") e.s3(beat ? beat.s3 : 1);
+    else if (kind==="s4") e.s4(beat ? beat.s4 : 1);
+    else if (kind==="rub") e.rub();
+  },[soundOn,soundMode,rhythm]);
+
+  // Alarm loop. Alarms belong to the monitor, not the stethoscope, so they
+  // only run in monitor mode. Priority follows IEC 60601-1-8: red (high) for
+  // the arrest rhythms, yellow (medium) for a rate outside the usual 50–120
+  // limits. High priority repeats insistently; medium backs off.
+  useEffect(()=>{
+    const e = engineRef.current;
+    if (!soundOn || soundMode!=="beep" || !isRunning) { if (e) e.stopAlarm(); return; }
+    const priority = alarmPriority(rhythm);
+    if (!priority) { if (e) e.stopAlarm(); return; }
+    const eng = e || (engineRef.current = createSoundEngine());
+    eng.stopAlarm();
+    let id;
+    const fire = () => {
+      const len = eng.alarm(priority);
+      id = setTimeout(fire, (len + (priority==="high" ? 1.4 : 5.5)) * 1000);
+    };
+    fire();
+    return ()=>{ clearTimeout(id); eng.stopAlarm(); };
+  },[soundOn,soundMode,isRunning,rhythm]);
 
   const toggleSound = () => {
     // First click doubles as the user gesture that unlocks the AudioContext.
@@ -1501,8 +1968,8 @@ export default function ECGSimulatorGuide() {
               <button className="ctrl-btn" onClick={()=>setSpeed(s=>s===0.5?1:s===1?1.5:s===1.5?2:0.5)}>×{speed}</button>
               <button className={`ctrl-btn ${soundOn?"on":""}`} onClick={toggleSound} title={soundOn?"Mute":"Enable sound"}>{soundOn?"🔊":"🔇"}</button>
               {soundOn && (
-                <button className="ctrl-btn" onClick={()=>setSoundMode(m=>m==="beep"?"heart":"beep")} title="Switch between monitor beep and heart sounds">
-                  {soundMode==="beep"?"beep":"lub-dub"}
+                <button className="ctrl-btn" onClick={()=>setSoundMode(m=>m==="beep"?"heart":"beep")} title="Switch between the bedside monitor (QRS tone + alarms) and the stethoscope (heart sounds)">
+                  {soundMode==="beep"?"monitor":"stethoscope"}
                 </button>
               )}
             </div>
@@ -1598,6 +2065,21 @@ export default function ECGSimulatorGuide() {
                 <div style={{fontSize:10,color:"#475569",letterSpacing:".15em",marginBottom:2}}>CLINICAL PEARL</div>
                 <div style={{fontSize:13,color:"#94a3b8",lineHeight:1.7}}>{current.clinicalNote}</div>
               </div>
+              {RHYTHM_AUDIO[rhythm] && RHYTHM_AUDIO[rhythm].note && (
+                <div style={{padding:"8px 11px",borderRadius:6,background:"rgba(96,165,250,0.03)",borderLeft:"2px solid rgba(96,165,250,0.3)",marginBottom:8}}>
+                  <div style={{fontSize:10,color:"#475569",letterSpacing:".15em",marginBottom:2,display:"flex",alignItems:"center",gap:6}}>
+                    <span>WHAT IT SOUNDS LIKE</span>
+                    {alarmPriority(rhythm) && (
+                      <span style={{fontSize:9,padding:"1px 6px",borderRadius:3,letterSpacing:".08em",
+                        background: alarmPriority(rhythm)==="high" ? "rgba(239,68,68,0.15)" : "rgba(251,191,36,0.13)",
+                        color: alarmPriority(rhythm)==="high" ? "#ef4444" : "#fbbf24"}}>
+                        {alarmPriority(rhythm)==="high" ? "RED ALARM" : "YELLOW ALARM"}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{fontSize:13,color:"#94a3b8",lineHeight:1.7}}>{RHYTHM_AUDIO[rhythm].note}</div>
+                </div>
+              )}
               <div style={{fontSize:11,color:"#475569",fontStyle:"italic"}}>Ref: {current.reference}</div>
             </div>
           )}
