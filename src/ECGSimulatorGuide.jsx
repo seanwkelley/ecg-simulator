@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import ElectricalPathway, { triggerElectricalPathway } from "./ElectricalPathway.jsx";
 
 /* ═══════════════════════════════════════════════════════════════
    ECG SIMULATOR — COMPREHENSIVE RHYTHM GUIDE v3
@@ -576,6 +577,7 @@ const WAVE_COMPONENTS = [
 ];
 
 const CATEGORIES = ["All","Normal","Bradycardia","Tachycardia","Arrhythmia","Conduction","Ischemia","Metabolic","Paced","Emergency"];
+const NO_COORDINATED_CONTRACTION = new Set(["ventricular_fibrillation","asystole","torsades","pea"]);
 
 /* ═══════════════ BEAT TIMING & AUSCULTATION MODEL ═══════════════
    One clock drives both the trace and the sound, so what you hear always
@@ -841,10 +843,11 @@ function makeBeatClock(rhythm) {
     return schedule(b);
   }
 
-  /* Turn a beat into a list of [seconds-after-beat-start, sound] events.
-     A beat with no QRS produces none at all — that is the point. */
+  /* Turn a beat into a list of [seconds-after-beat-start, event] entries.
+     The pathway event also fires for a non-conducted P wave, so a dropped beat
+     can visibly reach the block and stop without producing heart sounds. */
   function schedule(b) {
-    b.ev = [];
+    b.ev = [[Math.max(0.002, 0.04 * b.ref), "pathway"]];
     // Pacing spikes are ~0.5–2 ms wide — far narrower than one sample of the
     // sweep, so they cannot be drawn from the waveform (they land on 0 or 1
     // sample and flicker). Real monitors have the same problem and solve it the
@@ -1402,7 +1405,7 @@ function ECGCanvas({ rhythm, isRunning, speed, height=230, leadName="II", onBeat
 }
 
 /* Mini canvas for 12-lead grid (no glow, thinner) */
-function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70 }) {
+function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70, onBeat }) {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
   const dataRef = useRef([]);
@@ -1412,6 +1415,8 @@ function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70 }) {
   const clockRef = useRef(null);
   const beatRef = useRef(null);
   const elapsedRef = useRef(0);
+  const onBeatRef = useRef(onBeat);
+  useEffect(()=>{ onBeatRef.current = onBeat; },[onBeat]);
 
   const leadMod = useMemo(() => {
     const base = LEAD_MODS[leadName] || LEAD_MODS.II;
@@ -1441,8 +1446,14 @@ function MiniECGCanvas({ rhythm, isRunning, speed, leadName, height=70 }) {
         const from = elapsedRef.current;
         let to = from + step;
         let spike = 0;
+        if (onBeatRef.current) {
+          for (const [when, kind] of beat.ev) if (when>from && when<=to) onBeatRef.current(kind, beat);
+        }
         for (const s of beat.spikes) if (s.t>from && s.t<=to) spike = s.kind==="A" ? 1 : 2;
         if (to >= beat.dur) { to -= beat.dur; beat = beatRef.current = clockRef.current.next();
+          if (onBeatRef.current) {
+            for (const [when, kind] of beat.ev) if (when<=to) onBeatRef.current(kind, beat);
+          }
           for (const s of beat.spikes) if (s.t<=to) spike = s.kind==="A" ? 1 : 2; }
         elapsedRef.current = to;
         dataRef.current.push(generateECGPoint(timeRef.current, rhythm, to/beat.ref, leadMod, beat));
@@ -1946,7 +1957,42 @@ export default function ECGSimulatorGuide() {
   useEffect(()=>{const c=()=>setIsMobile(window.innerWidth<=840);c();window.addEventListener("resize",c);return()=>window.removeEventListener("resize",c)},[]);
 
   const engineRef = useRef(null);
+  const pathwayRef = useRef(null);
+  const rightVentricleRef = useRef(null);
+  const leftVentricleRef = useRef(null);
   const handleBeat = useCallback((kind, beat)=>{
+    if (kind==="pathway") triggerElectricalPathway(pathwayRef.current, rhythm, beat, speed);
+    if (kind==="s1" && !NO_COORDINATED_CONTRACTION.has(rhythm)) {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const rightVentricle = rightVentricleRef.current;
+      const leftVentricle = leftVentricleRef.current;
+      if (rightVentricle && leftVentricle && !reduceMotion) {
+        rightVentricle.getAnimations().forEach(animation=>animation.cancel());
+        leftVentricle.getAnimations().forEach(animation=>animation.cancel());
+        const rate = Math.max(35, RHYTHMS[rhythm].bpm || 72) * speed;
+        const duration = Math.max(150, Math.min(420, (60000 / rate) * 0.42));
+        let rightDelay = 0;
+        let leftDelay = 0;
+        if (rhythm === "lbbb" || rhythm === "paced_ventricular" || rhythm === "paced_dual" || rhythm === "ventricular_tachycardia" || rhythm === "aivr") leftDelay = 65 / speed;
+        if (rhythm === "rbbb") rightDelay = 65 / speed;
+        if (rhythm === "unifocal_pvc" && beat?.kind === "pvc") leftDelay = 50 / speed;
+        if (rhythm === "paced_biv") leftDelay = 8 / speed;
+        rightVentricle.animate([
+          { transform:"translate(0,0) scale(1,1)", offset:0 },
+          { transform:"translate(1px,-1px) scale(.985,.98)", offset:0.18 },
+          { transform:"translate(5px,-4px) scale(.91,.9)", offset:0.48 },
+          { transform:"translate(2px,-2px) scale(.965,.96)", offset:0.72 },
+          { transform:"translate(0,0) scale(1,1)", offset:1 },
+        ], { delay:rightDelay, duration, easing:"cubic-bezier(.22,.61,.36,1)", iterations:1 });
+        leftVentricle.animate([
+          { transform:"translate(0,0) scale(1,1)", offset:0 },
+          { transform:"translate(-1px,-1px) scale(.982,.977)", offset:0.18 },
+          { transform:"translate(-5px,-5px) scale(.9,.88)", offset:0.48 },
+          { transform:"translate(-2px,-2px) scale(.96,.95)", offset:0.72 },
+          { transform:"translate(0,0) scale(1,1)", offset:1 },
+        ], { delay:leftDelay, duration, easing:"cubic-bezier(.22,.61,.36,1)", iterations:1 });
+      }
+    }
     if (!soundOn) return;
     const e = engineRef.current || (engineRef.current = createSoundEngine());
     const prof = RHYTHM_AUDIO[rhythm] || {};
@@ -1961,7 +2007,7 @@ export default function ECGSimulatorGuide() {
     else if (kind==="s3") e.s3(beat ? beat.s3 : 1);
     else if (kind==="s4") e.s4(beat ? beat.s4 : 1);
     else if (kind==="rub") e.rub();
-  },[soundOn,soundMode,rhythm]);
+  },[soundOn,soundMode,rhythm,speed]);
 
   // Alarm loop. Alarms belong to the monitor, not the stethoscope, so they
   // only run in monitor mode. Priority follows IEC 60601-1-8: red (high) for
@@ -1998,6 +2044,7 @@ export default function ECGSimulatorGuide() {
         @keyframes heartbeat{0%,100%{transform:scale(1)}15%{transform:scale(1.3)}30%{transform:scale(1)}45%{transform:scale(1.15)}60%{transform:scale(1)}}
         @keyframes glow-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
         @keyframes fade-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes ep-wavefront{0%{opacity:0;stroke-dashoffset:.12}8%{opacity:1}84%{opacity:1}100%{opacity:0;stroke-dashoffset:-.92}}
         *{box-sizing:border-box}
         .cat-pill{padding:4px 10px;border-radius:16px;border:1px solid rgba(100,116,139,0.18);background:transparent;color:#64748b;font-family:inherit;font-size:13px;cursor:pointer;transition:all .2s;letter-spacing:.06em;white-space:nowrap}
         .cat-pill:hover{border-color:rgba(52,211,153,0.35);color:#94a3b8}.cat-pill.active{border-color:#34d399;color:#34d399;background:rgba(52,211,153,0.08)}
@@ -2011,6 +2058,49 @@ export default function ECGSimulatorGuide() {
         .wave-card:hover{border-color:rgba(100,116,139,0.2);background:rgba(15,23,42,0.4)}
         .lead-btn{padding:3px 7px;border-radius:4px;border:1px solid rgba(100,116,139,0.12);background:transparent;color:#64748b;font-family:inherit;font-size:12px;cursor:pointer;transition:all .15s}
         .lead-btn:hover{border-color:rgba(52,211,153,0.3);color:#94a3b8}.lead-btn.active{border-color:#34d399;color:#34d399;background:rgba(52,211,153,0.08)}
+        .monitor-study-layout{display:grid;grid-template-columns:minmax(276px,31%) minmax(0,1fr);gap:8px;align-items:stretch;margin-bottom:8px}
+        .monitor-column{min-width:0}
+        .electrical-card{min-height:230px;border:1px solid rgba(52,211,153,.1);border-radius:8px;background:linear-gradient(160deg,rgba(15,23,42,.72),rgba(5,10,20,.94));overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 30px rgba(52,211,153,.025)}
+        .electrical-card-head{display:flex;align-items:center;justify-content:space-between;padding:7px 9px 0;color:#64748b;font-size:10px;letter-spacing:.16em}
+        .electrical-live{font-size:9px;color:#64748b;letter-spacing:.1em}.electrical-live.on{color:#34d399}
+        .electrical-figure{flex:1;min-height:0;padding:0 6px}.electrical-figure svg{display:block;width:100%;height:176px;overflow:visible}
+        .ep-heart-shadow{fill:#020617;opacity:.62;transform:translate(2px,5px);filter:blur(3px)}
+        .ep-heart-shell{fill:url(#ep-myocardium);stroke:rgba(244,114,129,.56);stroke-width:2.2;filter:drop-shadow(0 7px 9px rgba(0,0,0,.28))}
+        .ep-auricle{fill:url(#ep-cut-myocardium);stroke:rgba(244,114,129,.5);stroke-width:1.4}.ep-auricle-right{fill:#6f3449}
+        .ep-atrium-wall,.ep-ventricle-wall{fill:url(#ep-cut-myocardium);stroke:rgba(248,150,163,.42);stroke-width:1.4;stroke-linejoin:round}.ep-rv-wall{fill:#71384c}.ep-lv-wall-shape{fill:url(#ep-cut-myocardium);stroke-width:2}
+        .ep-chamber{stroke-width:1.2}.ep-ra,.ep-rv{fill:url(#ep-right-chamber);stroke:rgba(123,196,221,.52)}.ep-la,.ep-lv{fill:url(#ep-left-chamber);stroke:rgba(244,145,159,.56)}
+        .ep-la{opacity:.8}.ep-lv{stroke-width:1.5}
+        .ep-endocardial-rim{fill:none;stroke:url(#ep-endocardium);stroke-width:4;stroke-linecap:round}
+        .ep-septum{fill:none;stroke:rgba(222,116,134,.62);stroke-width:7;stroke-linecap:round}
+        .ep-av-groove{fill:none;stroke:rgba(251,191,36,.16);stroke-width:2.2;stroke-linecap:round}
+        .ep-fossa-ovalis{fill:rgba(30,55,71,.48);stroke:rgba(164,210,225,.34);stroke-width:1.1}
+        .ep-great-vessels{fill:none}.ep-vessel{stroke-width:16;stroke-linecap:round}.ep-vessel-branch{fill:none;stroke-width:8;stroke-linecap:round}.ep-vessel-venous{stroke:url(#ep-venous-vessel)}.ep-vessel-arterial{stroke:url(#ep-arterial-vessel)}.ep-vessel-pulmonary{stroke:url(#ep-venous-vessel)}
+        .ep-pulmonary-vein{fill:none;stroke:#a64a5d;stroke-width:6;stroke-linecap:round}
+        .ep-vessel-labels text{fill:rgba(226,232,240,.78);font-size:8px;font-weight:800;letter-spacing:.06em;paint-order:stroke;stroke:#07101e;stroke-width:2px}
+        .ep-valves path{fill:none;stroke:rgba(248,215,204,.72);stroke-width:1.5;stroke-linecap:round}.ep-valves .ep-chordae{stroke:rgba(248,215,204,.38);stroke-width:.85}.ep-valves .ep-semilunar{stroke-width:1.8}
+        .ep-anatomy-labels text{fill:rgba(226,232,240,.62);font-size:8.5px;font-weight:800;letter-spacing:.06em;paint-order:stroke;stroke:#07101e;stroke-width:1.6px}
+        .ep-ventricular-motion{will-change:transform;transform-box:fill-box}.ep-rv-motion{transform-origin:right 82%}.ep-lv-motion{transform-origin:left 82%}
+        .ep-ventricle-fiber{fill:none;stroke:rgba(252,165,165,.16);stroke-width:1.2;stroke-linecap:round}.ep-papillary{fill:none;stroke:rgba(254,202,202,.36);stroke-width:4;stroke-linecap:round}.ep-moderator-band{fill:none;stroke:rgba(147,197,253,.32);stroke-width:3;stroke-linecap:round}
+        .ep-base-network path{fill:none;stroke:rgba(203,213,225,.3);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}.ep-base-network .ep-network-his{stroke:rgba(253,224,71,.42);stroke-width:3.2}.ep-base-network .ep-network-bundle{stroke:rgba(203,213,225,.48);stroke-width:3.2}.ep-base-network .ep-network-purkinje{stroke:rgba(203,213,225,.4);stroke-width:2.1}
+        .ep-conduction-labels text{fill:rgba(226,232,240,.78);font-size:7.3px;font-weight:800;letter-spacing:.06em;paint-order:stroke;stroke:#07101e;stroke-width:1.8px}.ep-conduction-labels text:last-child{fill:#fcd34d}
+        .ep-purkinje-callout path{fill:none;stroke:rgba(203,213,225,.62);stroke-width:1}.ep-purkinje-callout rect{fill:rgba(7,16,30,.9);stroke:rgba(203,213,225,.34);stroke-width:.8}.ep-purkinje-callout text{fill:#e2e8f0;font-size:7px;font-weight:800;letter-spacing:.08em}
+        .ep-route{fill:none;stroke:var(--ep-color);stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:.1 .9;stroke-dashoffset:.12;opacity:0;filter:drop-shadow(0 0 4px var(--ep-color))}
+        .ep-continuous{opacity:.85;animation-name:ep-wavefront;animation-timing-function:linear;animation-iteration-count:infinite}
+        .ep-loop{stroke:#f59e0b;stroke-width:4.5}.ep-retrograde{stroke:#60a5fa}.ep-irregular{stroke:#34d399}.ep-chaos{stroke:#fb7185;stroke-dasharray:.07 .93}.ep-chaos-v{stroke:#ef4444}
+        .ep-escape,.ep-ectopic{stroke:#f97316}.ep-diffuse{stroke:#fbbf24;stroke-width:6}.ep-cell-to-cell{stroke:#fb923c}.ep-accessory{stroke:#e879f9;stroke-width:5}.ep-pacer-lead{stroke:#60a5fa;stroke-width:3}
+        .ep-delay-ring{fill:none;stroke:#f59e0b;stroke-width:4;stroke-dasharray:.16 .1;opacity:.18;filter:drop-shadow(0 0 4px #f59e0b)}
+        .ep-intermittent,[data-block-level="lbbb"],[data-block-level="rbbb"]{opacity:.32;transform-box:fill-box;transform-origin:center}
+        .ep-block-mark circle{fill:#1e0b12;stroke:#ef4444;stroke-width:2}.ep-block-mark path{fill:none;stroke:#ef4444;stroke-width:2}
+        .ep-focus{fill:#f97316;stroke:#ffedd5;stroke-width:2;filter:drop-shadow(0 0 6px #f97316)}.ep-focus-alt{fill:#e879f9;filter:drop-shadow(0 0 6px #e879f9)}
+        .ep-pacer{fill:#111827;stroke:#60a5fa;stroke-width:1.5}.ep-pacer-bolt{fill:#60a5fa}
+        .ep-nodes circle{fill:#fde047;stroke:#fff7ae;stroke-width:1.5;filter:drop-shadow(0 0 5px #fde047)}.ep-nodes circle.off{fill:#334155;stroke:#475569;filter:none}.ep-nodes text{fill:#94a3b8;font-size:9px;font-weight:700;letter-spacing:.08em}
+        .ep-asystole line{stroke:#ef4444;stroke-width:2;stroke-dasharray:5 5}.ep-asystole text{fill:#ef4444;font-size:9px;font-weight:700;letter-spacing:.12em}
+        .ep-pea-label rect{fill:rgba(245,158,11,.12);stroke:rgba(245,158,11,.42)}.ep-pea-label text{fill:#fbbf24;font-size:9px;font-weight:700;letter-spacing:.1em}
+        .electrical-copy{padding:5px 12px 10px;display:flex;flex-direction:column;gap:5px;min-height:76px}.electrical-copy strong{color:var(--ep-color);font-size:12px;line-height:1.25;letter-spacing:.075em}.electrical-copy span{color:#d6e0ed;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:12.5px;line-height:1.48;letter-spacing:.005em}
+        .electrical-legend{display:flex;gap:14px;padding:6px 12px 8px;border-top:1px solid rgba(100,116,139,.12);font-size:10px;color:#64748b}.electrical-legend span{display:flex;align-items:center;gap:5px}.electrical-legend i{width:13px;height:2px;display:inline-block}.ep-key-active{background:var(--ep-color);box-shadow:0 0 4px var(--ep-color)}.ep-key-base{background:#64748b}
+        @media(max-width:1050px){.monitor-study-layout{grid-template-columns:260px minmax(0,1fr)}.electrical-figure svg{height:165px}.electrical-copy span{font-size:12px}}
+        @media(max-width:700px){.monitor-study-layout{grid-template-columns:1fr}.electrical-card{min-height:0}.electrical-figure svg{height:205px}.electrical-copy{min-height:0}.electrical-legend{justify-content:center}}
+        @media(prefers-reduced-motion:reduce){.ep-route,.ep-delay-ring,.ep-intermittent{animation:none!important}.ep-continuous{stroke-dasharray:none;opacity:.55}}
         ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(52,211,153,0.12);border-radius:3px}
       `}</style>
 
@@ -2095,26 +2185,29 @@ export default function ECGSimulatorGuide() {
             </div>
           </div>
 
-          {/* Single Lead Monitor */}
           {viewMode==="single" && (
-            <>
-              <div style={{display:"flex",gap:3,marginBottom:6,flexWrap:"wrap"}}>
-                {LEAD_NAMES.map(l=><button key={l} className={`lead-btn ${selectedLead===l?"active":""}`} onClick={()=>setSelectedLead(l)}>{l}</button>)}
-              </div>
-              <div style={{borderRadius:8,overflow:"hidden",marginBottom:8,border:"1px solid rgba(52,211,153,0.1)",position:"relative",boxShadow:"0 0 30px rgba(52,211,153,0.03)"}}>
+            <div style={{display:"flex",gap:3,marginBottom:6,flexWrap:"wrap"}}>
+              {LEAD_NAMES.map(l=><button key={l} className={`lead-btn ${selectedLead===l?"active":""}`} onClick={()=>setSelectedLead(l)}>{l}</button>)}
+            </div>
+          )}
+
+          <div className="monitor-study-layout">
+            <ElectricalPathway rhythm={rhythm} bpm={current.bpm} color={current.color} category={current.category} isRunning={isRunning} speed={speed} pathwayRef={pathwayRef} rightVentricleRef={rightVentricleRef} leftVentricleRef={leftVentricleRef}/>
+            <div className="monitor-column">
+              {/* Single Lead Monitor */}
+              {viewMode==="single" ? (
+                <div style={{borderRadius:8,overflow:"hidden",border:"1px solid rgba(52,211,153,0.1)",position:"relative",boxShadow:"0 0 30px rgba(52,211,153,0.03)"}}>
                 <ECGCanvas rhythm={rhythm} isRunning={isRunning} speed={speed} height={isMobile?180:220} leadName={selectedLead} onBeat={handleBeat}/>
                 <div style={{position:"absolute",top:7,left:10,fontSize:13,color:"#34d399",fontWeight:600,opacity:.6,letterSpacing:".1em"}}>{selectedLead}</div>
                 <div style={{position:"absolute",top:7,right:10,fontSize:10,color:"#475569"}}>25 mm/s · 10 mm/mV</div>
                 <div style={{position:"absolute",bottom:7,left:10,fontSize:10,color:"#475569"}}>{current.abbr}</div>
                 {current.bpm===0&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:16,fontWeight:700,color:"#ef4444",letterSpacing:".15em",textShadow:"0 0 20px rgba(239,68,68,0.5)"}}>NO OUTPUT</div>}
                 {rhythm==="pea"&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center",fontSize:15,fontWeight:700,color:"#f59e0b",letterSpacing:".13em",textShadow:"0 0 20px rgba(245,158,11,0.45)"}}>NO PULSE<div style={{fontSize:10,letterSpacing:".1em",opacity:.85,marginTop:3}}>CHECK THE PATIENT, NOT THE MONITOR</div></div>}
-              </div>
-            </>
-          )}
+                </div>
+              ) : (
 
-          {/* 12-Lead Grid */}
-          {viewMode==="twelve" && (
-            <div key={rhythm+"12"} style={{marginBottom:8}}>
+              /* 12-Lead Grid */
+              <div key={rhythm+"12"}>
               {/* Territory key — standard 4×3 lead layout */}
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:2,marginBottom:6}}>
                 {LEAD_GRID.flat().map(l=>{
@@ -2133,15 +2226,17 @@ export default function ECGSimulatorGuide() {
                   const t=LEAD_TERRITORY[l];
                   return (
                     <div key={l} style={{borderRadius:6,overflow:"hidden",border:`1px solid ${t.color}33`,borderTop:`2px solid ${t.color}`,position:"relative"}}>
-                      <MiniECGCanvas rhythm={rhythm} isRunning={isRunning} speed={speed} leadName={l} height={isMobile?55:70}/>
+                      <MiniECGCanvas rhythm={rhythm} isRunning={isRunning} speed={speed} leadName={l} height={isMobile?55:70} onBeat={l==="II"?handleBeat:undefined}/>
                       <div style={{position:"absolute",top:4,left:5,fontSize:11,color:t.color,fontWeight:700}}>{l}</div>
                       {t.zone&&<div style={{position:"absolute",bottom:3,right:5,fontSize:8,color:t.color,opacity:.75,letterSpacing:".08em",textTransform:"uppercase"}}>{t.zone}</div>}
                     </div>
                   );
                 })}
               </div>
+              </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Tabs */}
           <div style={{display:"flex",gap:4,marginBottom:8}}>

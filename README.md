@@ -28,6 +28,7 @@ Built as a single React component, zero runtime dependencies beyond React. Educa
 - **Real R-R intervals** — AF is irregularly irregular, Wenckebach's R-R shortens through the group before the pause, PVCs carry a full compensatory pause, and sinus rhythm has respiratory sinus arrhythmia. Timing drives both the trace and the sound.
 - **Monitor-style pacing indicators** — a real pacing spike is 0.5–2 ms wide, narrower than one sample of the sweep, so it cannot be drawn from the waveform (it lands on 0 or 1 sample and flickers). Real monitors synthesise a marker instead, and so does this: the beat clock emits spike *times* and the canvas draws them, correctly placed for atrial vs ventricular leads.
 - **Speed control**, play/pause, category filter, mobile-friendly layout.
+- **Rhythm-synchronised electrical pathway visualisation** — an animated anatomical cutaway shows SA/AV/His–Purkinje activation, atrial re-entry and fibrillation, AV blocks, bundle-branch delay, ventricular ectopy/chaos, accessory pathways, junctional escape, and atrial/ventricular/dual-chamber/CRT pacing. Mechanical contraction is triggered by the same beat clock as the QRS—even for irregular and dropped-beat patterns—while PEA, VF, torsades, and asystole correctly show no coordinated squeeze. It follows playback speed and pause state, with a stacked mobile layout and reduced-motion fallback.
 
 ## Quick start
 
@@ -60,6 +61,7 @@ The whole UI lives in `src/ECGSimulatorGuide.jsx`. The pieces:
 - `createSoundEngine()` — Web Audio synth for the monitor tone, IEC alarm bursts, and the valve sounds.
 - `ECGCanvas` — the main monitor with glow + fade trail.
 - `MiniECGCanvas` — lightweight per-lead canvas for the 12-lead grid (no glow, thinner trace, smaller grid).
+- `ElectricalPathway` — memoized SVG conduction schematic with rhythm profiles for organized, blocked, re-entrant, chaotic, ectopic, accessory, and paced activation patterns.
 
 State:
 
